@@ -1,0 +1,3 @@
+[submodule "benchmarking/faiss"]
+	path = benchmarking/faiss
+	url = https://github.com/facebookresearch/faiss.git
