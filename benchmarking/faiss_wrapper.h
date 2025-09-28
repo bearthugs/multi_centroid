@@ -25,6 +25,9 @@ void faiss_add_vectors(FaissIndex index, float* data, int n, int dim);
 // Search vectors
 void faiss_search_vectors(FaissIndex index, float* queries, int n_query, int dim, int k, int64_t* labels, float* distances);
 
+void faiss_search(FaissIndex index, int n, float* queries, int dim, int k,
+                  float* distances, int64_t* labels);
+
 // Free index memory
 void faiss_free_index(FaissIndex index);
 
