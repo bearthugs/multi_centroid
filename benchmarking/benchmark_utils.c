@@ -148,3 +148,70 @@ int load_fvecs_both(const char* filename, float** row_major, float** col_major, 
     *out_dim = dim;
     return 1;
 }
+
+// Load ground truth neighbours (int32_t like in fvecs, but IDs instead of floats)
+int* load_ivecs(const char* filename, int* out_num_queries, int* out_k) {
+    FILE* f = fopen(filename, "rb");
+    if (!f) {
+        perror("Failed to open ivecs file");
+        return NULL;
+    }
+
+    int dim = 0;
+    if (fread(&dim, sizeof(int), 1, f) != 1) {
+        perror("Failed to read ivecs dim");
+        fclose(f);
+        return NULL;
+    }
+
+    // Get file size
+    fseek(f, 0, SEEK_END);
+    long file_size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    long vec_size = sizeof(int) + dim * sizeof(int);
+    int num_vecs = (int)(file_size / vec_size);
+
+    int* data = (int*)malloc(num_vecs * dim * sizeof(int));
+    if (!data) {
+        perror("malloc failed");
+        fclose(f);
+        return NULL;
+    }
+
+    for (int i = 0; i < num_vecs; i++) {
+        int d = 0;
+        fread(&d, sizeof(int), 1, f);
+        if (d != dim) {
+            fprintf(stderr, "Dimension mismatch in ivecs\n");
+            free(data);
+            fclose(f);
+            return NULL;
+        }
+        fread(data + i * dim, sizeof(int), dim, f);
+    }
+
+    fclose(f);
+    *out_num_queries = num_vecs;
+    *out_k = dim;
+    return data;
+}
+
+// Compute Recall@k
+double compute_recall_at_k(const int64_t* retrieved, int n_query, int k,
+                           const int* gt, int gt_k) {
+    int correct = 0;
+    for (int i = 0; i < n_query; i++) {
+        for (int j = 0; j < k; j++) {
+            int64_t id = retrieved[i * k + j];
+            // check if this id is in the ground truth top-gt_k list
+            for (int g = 0; g < gt_k; g++) {
+                if (gt[i * gt_k + g] == id) {
+                    correct++;
+                    break;
+                }
+            }
+        }
+    }
+    return (double)correct / (n_query * k);
+}

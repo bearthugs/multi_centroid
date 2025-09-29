@@ -34,4 +34,24 @@ void faiss_free_index(FaissIndex index) {
     delete hnsw_index;
 }
 
+void faiss_hnsw_set_efSearch(FaissIndex index, int ef) {
+    faiss::Index* idx = reinterpret_cast<faiss::Index*>(index);
+    faiss::IndexHNSW* hnsw = dynamic_cast<faiss::IndexHNSW*>(idx);
+    if (!hnsw) {
+        fprintf(stderr, "Error: Index is not an HNSW index\n");
+        return;
+    }
+    hnsw->hnsw.efSearch = ef;
+}
+
+void faiss_hnsw_set_efConstruction(FaissIndex index, int ef) {
+    faiss::Index* idx = reinterpret_cast<faiss::Index*>(index);
+    faiss::IndexHNSW* hnsw = dynamic_cast<faiss::IndexHNSW*>(idx);
+    if (!hnsw) {
+        fprintf(stderr, "Error: Index is not an HNSW index\n");
+        return;
+    }
+    hnsw->hnsw.efConstruction = ef;
+}
+
 } // extern "C"

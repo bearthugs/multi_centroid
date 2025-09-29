@@ -28,6 +28,10 @@ void faiss_search_vectors(FaissIndex index, float* queries, int n_query, int dim
 void faiss_search(FaissIndex index, int n, float* queries, int dim, int k,
                   float* distances, int64_t* labels);
 
+void faiss_hnsw_set_efSearch(FaissIndex index, int ef);
+
+void faiss_hnsw_set_efConstruction(FaissIndex index, int ef);
+
 // Free index memory
 void faiss_free_index(FaissIndex index);
 

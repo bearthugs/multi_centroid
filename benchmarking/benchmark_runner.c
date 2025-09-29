@@ -1,7 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include "faiss_wrapper.h"
+#include "benchmark_timer.h"
+#include "benchmark_utils.h"
 
 // Declare load_fvecs
 float* load_fvecs(const char* filename, int* out_num_vectors, int* out_dim);
@@ -9,56 +13,89 @@ float* load_fvecs(const char* filename, int* out_num_vectors, int* out_dim);
 void run_benchmark(const char* base_vectors_file, const char* query_vectors_file, int k) {
     int d_base, n_base;
     float* base_vectors = load_fvecs(base_vectors_file, &n_base, &d_base);
-    if (!base_vectors) {
-        fprintf(stderr, "Failed to load base vectors\n");
-        return;
-    }
 
     int d_query, n_query;
     float* query_vectors = load_fvecs(query_vectors_file, &n_query, &d_query);
-    if (!query_vectors) {
-        fprintf(stderr, "Failed to load query vectors\n");
-        free(base_vectors);
-        return;
-    }
 
     if (d_base != d_query) {
-        fprintf(stderr, "Dimension mismatch between base and query vectors\n");
-        free(base_vectors);
-        free(query_vectors);
+        fprintf(stderr, "Dimension mismatch\n");
         return;
     }
 
-    printf("Building FAISS HNSW index with %d vectors, dimension %d...\n", n_base, d_base);
+    // Load ground truth
+    int gt_nq, gt_k;
+    int* gt = load_ivecs("../fvecs_data/sift-128-euclidean_neighbours.ivecs", &gt_nq, &gt_k);
+    if (!gt || gt_nq != n_query) {
+        fprintf(stderr, "Ground truth size mismatch\n");
+        return;
+    }
+
+    mkdir("results", 0777);
+
+    FILE* csv = fopen("./results/benchmark_results.csv", "w");
+    if (!csv) {
+        perror("Failed to open CSV file");
+        return;
+    }
+
+    fprintf(csv, "target_recall,efSearch,recall,query_time\n");
+
+    // 1. Index build (construction overhead)
+    printf("Building FAISS HNSW index...\n");
+    double t0 = wall_time();
     FaissIndex index = faiss_create_hnsw_index(d_base, 32);
     faiss_add_vectors(index, base_vectors, n_base, d_base);
+    double t_build = wall_time() - t0;
+    printf("Construction time: %.3f s\n", t_build);
 
-    printf("Searching %d queries for %d nearest neighbors each...\n", n_query, k);
-    float* distances = (float*)malloc(n_query * k * sizeof(float));
-    //int64_t* labels = (int64_t*)malloc(n_query * k * sizeof(int64_t));
+    // 2. Search (query overhead)
+    float* distances = malloc(n_query * k * sizeof(float));
     int64_t* labels = malloc(n_query * k * sizeof(int64_t));
-    if (!distances || !labels) {
-        fprintf(stderr, "Failed to allocate search output arrays\n");
-        faiss_free_index(index);
-        free(base_vectors);
-        free(query_vectors);
-        free(distances);
-        free(labels);
-        return;
-    }
 
+    printf("Searching...\n");
+    t0 = wall_time();
     faiss_search(index, n_query, query_vectors, d_query, k, distances, labels);
+    double t_search = wall_time() - t0;
+    printf("Query time: %.3f s\n", t_search);
 
-    // Print first 5 results for the first query as example
-    printf("Top %d results for first query:\n", k);
-    for (int i = 0; i < k; i++) {
-        printf("  rank %d: id=%lld dist=%f\n", i, labels[i], distances[i]);
+    // 3. Combined
+    printf("Total time (build + search): %.3f s\n", t_build + t_search);
+
+    // 4. Accuracy (recall)
+    double recall = compute_recall_at_k(labels, n_query, k, gt, gt_k);
+    printf("Recall@%d = %.4f\n", k, recall);
+
+    // 5. Sweep for target recalls
+    double targets[] = {0.95, 0.98, 0.99};
+    for (int ti = 0; ti < 3; ti++) {
+        double target = targets[ti];
+        printf("\n--- Benchmark for target recall %.2f ---\n", target);
+
+        for (int ef = 10; ef <= 500; ef += 10) {
+            faiss_hnsw_set_efSearch(index, ef);
+
+            double t0 = wall_time();
+            faiss_search(index, n_query, query_vectors, d_query, k, distances, labels);
+            double t_search = wall_time() - t0;
+
+            double recall = compute_recall_at_k(labels, n_query, k, gt, gt_k);
+
+            printf("efSearch=%d  recall=%.4f  query_time=%.3f s\n", ef, recall, t_search);
+
+            // Save to CSV
+            fprintf(csv, "%.2f,%d,%.4f,%.6f\n", target, ef, recall, t_search);
+
+            if (recall >= target) {
+                printf("Reached target recall %.2f with efSearch=%d\n", target, ef);
+                break;
+            }
+        }
     }
 
-    // Cleanup
-    faiss_free_index(index);
     free(base_vectors);
     free(query_vectors);
     free(distances);
     free(labels);
+    free(gt);
+    faiss_free_index(index);
 }
