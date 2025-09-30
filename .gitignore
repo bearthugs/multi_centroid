@@ -1,2 +1,5 @@
 datasets/
 fvecs_data/
+*.index
+*.csv
+*.txt
