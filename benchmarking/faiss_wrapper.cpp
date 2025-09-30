@@ -4,8 +4,10 @@
 #include <IndexIVFFlat.h>
 #include <index_io.h>
 #include <MetaIndexes.h>
+#include <cstdio>
 #include <vector>
 #include <iostream>
+#include <Index.h>
 
 struct FaissIndexWrapper {
     faiss::IndexHNSWFlat* index;
@@ -52,6 +54,18 @@ void faiss_hnsw_set_efConstruction(FaissIndex index, int ef) {
         return;
     }
     hnsw->hnsw.efConstruction = ef;
+}
+
+// Save HNSW index to file
+void faiss_save_index(FaissIndex index, const char* filename) {
+    faiss::Index* idx = reinterpret_cast<faiss::Index*>(index);
+    faiss::write_index(idx, filename);
+}
+
+// Load HNSW index from file
+FaissIndex faiss_load_index(const char* filename) {
+    faiss::Index* idx = faiss::read_index(filename);
+    return reinterpret_cast<FaissIndex>(idx);
 }
 
 } // extern "C"

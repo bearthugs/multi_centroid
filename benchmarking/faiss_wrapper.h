@@ -35,6 +35,12 @@ void faiss_hnsw_set_efConstruction(FaissIndex index, int ef);
 // Free index memory
 void faiss_free_index(FaissIndex index);
 
+// Save index
+void faiss_save_index(FaissIndex index, const char* filename);
+
+// Load index
+FaissIndex faiss_load_index(const char* filename);
+
 #ifdef __cplusplus
 }
 #endif

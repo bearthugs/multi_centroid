@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <string.h>
 #include "faiss_wrapper.h"
 #include "benchmark_timer.h"
 #include "benchmark_utils.h"
@@ -10,7 +11,35 @@
 // Declare load_fvecs
 float* load_fvecs(const char* filename, int* out_num_vectors, int* out_dim);
 
-void run_benchmark(const char* base_vectors_file, const char* query_vectors_file, int k) {
+void get_dataset_name(const char* query_path, char* dataset_name, size_t size) {
+    // Extract just the filename part
+    const char* filename = strrchr(query_path, '/');
+    if (!filename) {
+        filename = query_path;
+    } else {
+        filename++; // skip '/'
+    }
+
+    // Copy filename into buffer
+    strncpy(dataset_name, filename, size - 1);
+    dataset_name[size - 1] = '\0';
+
+    // Remove the "_test.fvecs" suffix
+    char* suffix = strstr(dataset_name, "_test.fvecs");
+    if (suffix) {
+        *suffix = '\0';
+    }
+}
+
+void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors_file, const char* neighbours_file, int k) {
+    struct stat st;
+    FaissIndex index = NULL;
+    char index_filename[256];
+    char dataset_name[256];
+
+    double t0 = 0;
+    double t_build = 0;
+
     int d_base, n_base;
     float* base_vectors = load_fvecs(base_vectors_file, &n_base, &d_base);
 
@@ -24,7 +53,7 @@ void run_benchmark(const char* base_vectors_file, const char* query_vectors_file
 
     // Load ground truth
     int gt_nq, gt_k;
-    int* gt = load_ivecs("../fvecs_data/sift-128-euclidean_neighbours.ivecs", &gt_nq, &gt_k);
+    int* gt = load_ivecs(neighbours_file, &gt_nq, &gt_k);
     if (!gt || gt_nq != n_query) {
         fprintf(stderr, "Ground truth size mismatch\n");
         return;
@@ -40,13 +69,23 @@ void run_benchmark(const char* base_vectors_file, const char* query_vectors_file
 
     fprintf(csv, "target_recall,efSearch,recall,query_time\n");
 
+    get_dataset_name(query_vectors_file, dataset_name, sizeof(dataset_name));
+
+    snprintf(index_filename, sizeof(index_filename), "./results/%s_hnsw.index", dataset_name);
+
     // 1. Index build (construction overhead)
-    printf("Building FAISS HNSW index...\n");
-    double t0 = wall_time();
-    FaissIndex index = faiss_create_hnsw_index(d_base, 32);
-    faiss_add_vectors(index, base_vectors, n_base, d_base);
-    double t_build = wall_time() - t0;
-    printf("Construction time: %.3f s\n", t_build);
+    if (stat(index_filename, &st) == 0) {
+        printf("Loading existing HNSW index...\n");
+        index = faiss_load_index(index_filename);
+    }
+    else {
+        printf("Building FAISS HNSW index...\n");
+        t0 = wall_time();
+        index = faiss_create_hnsw_index(d_base, 32);
+        faiss_add_vectors(index, base_vectors, n_base, d_base);
+        t_build = wall_time() - t0;
+        printf("Construction time: %.3f s\n", t_build);
+    }
 
     // 2. Search (query overhead)
     float* distances = malloc(n_query * k * sizeof(float));
@@ -61,17 +100,21 @@ void run_benchmark(const char* base_vectors_file, const char* query_vectors_file
     // 3. Combined
     printf("Total time (build + search): %.3f s\n", t_build + t_search);
 
+    // Save the constructed HNSW graph
+    printf("Saving HNSW index...\n");
+    faiss_save_index(index, index_filename);
+
     // 4. Accuracy (recall)
     double recall = compute_recall_at_k(labels, n_query, k, gt, gt_k);
     printf("Recall@%d = %.4f\n", k, recall);
 
     // 5. Sweep for target recalls
-    double targets[] = {0.95, 0.98, 0.99};
-    for (int ti = 0; ti < 3; ti++) {
+    double targets[] = {0.99};
+    for (int ti = 0; ti < 1; ti++) {
         double target = targets[ti];
         printf("\n--- Benchmark for target recall %.2f ---\n", target);
 
-        for (int ef = 10; ef <= 500; ef += 10) {
+        for (int ef = 183; ef <= 10000; ef += 1) {
             faiss_hnsw_set_efSearch(index, ef);
 
             double t0 = wall_time();
@@ -98,4 +141,8 @@ void run_benchmark(const char* base_vectors_file, const char* query_vectors_file
     free(labels);
     free(gt);
     faiss_free_index(index);
+}
+
+void run_benchmark_ivf(const char* base_vectors_file, const char* query_vectors_file, const char* neighbours_file, int k) {
+
 }
