@@ -15,8 +15,10 @@ struct FaissIndexWrapper {
 
 extern "C" {
 
-FaissIndex faiss_create_hnsw_index(int dim, int M) {
-    auto wrapper = new faiss::IndexHNSWFlat(dim, M);
+FaissIndex faiss_create_hnsw_index(int dim, int M, int efConstruction, int metric_type) {
+    faiss::MetricType metric = (metric_type == 1) ? faiss::METRIC_INNER_PRODUCT : faiss::METRIC_L2;
+    auto wrapper = new faiss::IndexHNSWFlat(dim, M, metric);
+    wrapper->hnsw.efConstruction = efConstruction;
     return (FaissIndex)wrapper;
 }
 

@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <string.h>
+#include <math.h>
 #include "faiss_wrapper.h"
 #include "benchmark_timer.h"
 #include "benchmark_utils.h"
@@ -31,7 +32,20 @@ void get_dataset_name(const char* query_path, char* dataset_name, size_t size) {
     }
 }
 
-void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors_file, const char* neighbours_file, int k) {
+void normalize_vectors(float* data, int n, int d) {
+    for (int i = 0; i < n; i++) {
+        float norm = 0.0f;
+        for (int j = 0; j < d; j++)
+            norm += data[i * d + j] * data[i * d + j];
+        norm = sqrtf(norm);
+        if (norm > 1e-9f) { // small epsilon to avoid div by zero
+            for (int j = 0; j < d; j++)
+                data[i * d + j] /= norm;
+        }
+    }
+}
+
+void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors_file, const char* neighbours_file, int k, int metric) {
     struct stat st;
     FaissIndex index = NULL;
     char index_filename[256];
@@ -81,7 +95,11 @@ void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors
     else {
         printf("Building FAISS HNSW index...\n");
         t0 = wall_time();
-        index = faiss_create_hnsw_index(d_base, 32);
+        if (metric == 1) {
+            normalize_vectors(base_vectors, n_base, d_base);
+            normalize_vectors(query_vectors, n_query, d_query);
+        }
+        index = faiss_create_hnsw_index(d_base, 32, 200, metric); // metric = 1 for cosine
         faiss_add_vectors(index, base_vectors, n_base, d_base);
         t_build = wall_time() - t0;
         printf("Construction time: %.3f s\n", t_build);
@@ -108,6 +126,7 @@ void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors
     double recall = compute_recall_at_k(labels, n_query, k, gt, gt_k);
     printf("Recall@%d = %.4f\n", k, recall);
 
+    /*
     // 5. Sweep for target recalls
     double targets[] = {0.99};
     for (int ti = 0; ti < 1; ti++) {
@@ -134,6 +153,7 @@ void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors
             }
         }
     }
+    */
 
     free(base_vectors);
     free(query_vectors);

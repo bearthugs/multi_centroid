@@ -11,7 +11,7 @@ typedef void* FaissIndex;
 
 // Create different index types
 FaissIndex faiss_create_flat_index(int dim);
-FaissIndex faiss_create_hnsw_index(int dim, int M);
+FaissIndex faiss_create_hnsw_index(int dim, int M, int efConstruction, int metric);
 FaissIndex faiss_create_ivf_flat_index(int dim, int nlist);
 FaissIndex faiss_create_ivf_hnsw_index(int dim, int nlist, int M);
 FaissIndex faiss_create_ivf_pq_index(int dim, int nlist, int m, int nbits);
