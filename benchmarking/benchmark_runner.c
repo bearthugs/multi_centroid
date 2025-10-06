@@ -73,9 +73,9 @@ void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors
         return;
     }
 
-    mkdir("results", 0777);
+    mkdir("results_M8_efC200", 0777);
 
-    FILE* csv = fopen("./results/benchmark_results.csv", "w");
+    FILE* csv = fopen("./results_M8_efC200/benchmark_results.csv", "w");
     if (!csv) {
         perror("Failed to open CSV file");
         return;
@@ -85,7 +85,7 @@ void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors
 
     get_dataset_name(query_vectors_file, dataset_name, sizeof(dataset_name));
 
-    snprintf(index_filename, sizeof(index_filename), "./results/%s_hnsw.index", dataset_name);
+    snprintf(index_filename, sizeof(index_filename), "./results_M8_efC200/%s_hnsw.index", dataset_name);
 
     // 1. Index build (construction overhead)
     if (stat(index_filename, &st) == 0) {
@@ -99,7 +99,7 @@ void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors
             normalize_vectors(base_vectors, n_base, d_base);
             normalize_vectors(query_vectors, n_query, d_query);
         }
-        index = faiss_create_hnsw_index(d_base, 32, 200, metric); // metric = 1 for cosine
+        index = faiss_create_hnsw_index(d_base, 8, 200, metric); // metric = 1 for cosine
         faiss_add_vectors(index, base_vectors, n_base, d_base);
         t_build = wall_time() - t0;
         printf("Construction time: %.3f s\n", t_build);
