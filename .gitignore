@@ -1,7 +1,6 @@
 datasets/
 fvecs_data/
 *.index
-*.csv
 *.txt
 reduced_data/
 quantised_data/
