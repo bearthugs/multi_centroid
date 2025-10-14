@@ -1,0 +1,12 @@
+dataset,construction_time(ms),query_time(ms),recall@100,M,efConstruction
+coco-i2i-512-angular,42530,718,0.9005,64,100
+fashion-mnist-784-euclidean,26059,1032,0.9377,64,100
+gist-960-euclidean,41611392,631,0.5504,64,100
+glove-25-angular,151162,291,0.7895,64,100
+glove-50-angular,263456,399,0.6548,62,100
+glove-100-angular,2055983,570,0.5643,64,100
+glove-200-angular,9383366,892,0.5074,64,100
+lastfm-64-dot,151681,1035,0.8503,64,100
+mnist-784-euclidean,29544,1043,0.9410,64,100
+nytimes-256-angular,262562,721,0.6413,64,100
+sift-128-euclidean,245384,487,0.7664,64,100

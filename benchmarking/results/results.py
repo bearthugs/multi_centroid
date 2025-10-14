@@ -1,117 +1,130 @@
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-import os
 
-# Settings for nicer plots
-sns.set(style="whitegrid")
-plt.rcParams.update({'figure.max_open_warning': 0})
-
-# Load CSV
+# === Load data ===
 df = pd.read_csv("results.csv")
 
-# Ensure directory for graphs exists
-output_dir = "graphs"
-os.makedirs(output_dir, exist_ok=True)
+# Remove "deep-image-96-angular" datasets
+df = df[df["dataset"] != "deep-image-96-angular"]
 
+# Create output folder
+os.makedirs("graphs", exist_ok=True)
+
+# Define unique datasets and M values
 datasets = df["dataset"].unique()
+M_values = sorted(df["M"].unique())
+ef_values = sorted(df["efConstruction"].unique())
+df["dim_to_vec_ratio"] = df["dimensions"] * df["no_of_vectors"]
 
-for dataset in datasets:
-    data = df[df["dataset"] == dataset]
-
-    # Plot: Recall@100 vs. M for different efConstruction
+# === Helper: Plot function for dataset-based plots ===
+def plot_by_dataset(x_col, y_col, title, filename, xlabel=None, ylabel=None):
     plt.figure(figsize=(10, 6))
-    sns.lineplot(data=data, x="M", y="recall@100", hue="efConstruction", marker="o")
-    plt.title(f"Recall@100 vs. M — {dataset}")
-    plt.xlabel("M")
-    plt.ylabel("Recall@100")
-    plt.legend(title="efConstruction")
+    for dataset in datasets:
+        data = df[df["dataset"] == dataset]
+        grouped = data.groupby(x_col)[y_col].mean().reset_index()
+        plt.plot(grouped[x_col], grouped[y_col], marker="o", label=dataset)
+
+    plt.title(title)
+    plt.xlabel(xlabel if xlabel else x_col)
+    plt.ylabel(ylabel if ylabel else y_col)
+    plt.legend(fontsize=7, ncol=2)
+    plt.grid(True, linestyle='--', alpha=0.6)
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{dataset}_recall_vs_M.png")
+    plt.savefig(os.path.join("graphs", filename))
     plt.close()
 
-    # Plot: Construction time vs. M for different efConstruction
+# === Helper: Plot function for M-based plots at fixed efConstruction ===
+def plot_by_M_for_fixed_ef(x_col, y_col, ef_value, title, filename, xlabel=None, ylabel=None):
     plt.figure(figsize=(10, 6))
-    sns.lineplot(data=data, x="M", y="construction_time(ms)", hue="efConstruction", marker="o")
-    plt.title(f"Construction Time vs. M — {dataset}")
-    plt.xlabel("M")
-    plt.ylabel("Construction Time (ms)")
-    plt.legend(title="efConstruction")
+    subset = df[df["efConstruction"] == ef_value]
+    for M in M_values:
+        data = subset[subset["M"] == M]
+        grouped = data.groupby(x_col)[y_col].mean().reset_index()
+        plt.plot(grouped[x_col], grouped[y_col], marker="o", label=f"M={M}")
+
+    plt.title(title)
+    plt.xlabel(xlabel if xlabel else x_col)
+    plt.ylabel(ylabel if ylabel else y_col)
+    plt.legend(title="M", fontsize=8)
+    plt.grid(True, linestyle='--', alpha=0.6)
     plt.tight_layout()
-    plt.savefig(f"{output_dir}/{dataset}_construction_time_vs_M.png")
+    plt.savefig(os.path.join("graphs", filename))
     plt.close()
 
-    # Plot: Query time vs. M for different efConstruction
-    plt.figure(figsize=(10, 6))
-    sns.lineplot(data=data, x="M", y="query_time(ms)", hue="efConstruction", marker="o")
-    plt.title(f"Query Time vs. M — {dataset}")
-    plt.xlabel("M")
-    plt.ylabel("Query Time (ms)")
-    plt.legend(title="efConstruction")
-    plt.tight_layout()
-    plt.savefig(f"{output_dir}/{dataset}_query_time_vs_M.png")
-    plt.close()
-
-    # Plot: Recall vs. Construction time
-    plt.figure(figsize=(10, 6))
-    sns.scatterplot(data=data, x="construction_time(ms)", y="recall@100", hue="M", style="efConstruction", s=100)
-    plt.title(f"Recall@100 vs. Construction Time — {dataset}")
-    plt.xlabel("Construction Time (ms)")
-    plt.ylabel("Recall@100")
-    plt.legend(title="M / efConstruction", bbox_to_anchor=(1.05, 1), loc="upper left")
-    plt.tight_layout()
-    plt.savefig(f"{output_dir}/{dataset}_recall_vs_construction_time.png")
-    plt.close()
+# === 1–6: Dataset-based plots ===
+plot_by_dataset("M", "construction_time(ms)", "M vs Construction Time (ms)", "M_vs_construction_time.png", "M", "Construction Time (ms)")
+plot_by_dataset("efConstruction", "construction_time(ms)", "efConstruction vs Construction Time (ms)", "efConstruction_vs_construction_time.png", "efConstruction", "Construction Time (ms)")
+plot_by_dataset("M", "query_time(ms)", "M vs Query Time (ms)", "M_vs_query_time.png", "M", "Query Time (ms)")
+plot_by_dataset("efConstruction", "query_time(ms)", "efConstruction vs Query Time (ms)", "efConstruction_vs_query_time.png", "efConstruction", "Query Time (ms)")
+plot_by_dataset("M", "recall@100", "M vs Recall@100", "M_vs_recall.png", "M", "Recall@100")
+plot_by_dataset("efConstruction", "recall@100", "efConstruction vs Recall@100", "efConstruction_vs_recall.png", "efConstruction", "Recall@100")
 
 
-# ====== Averages across all datasets ======
-numeric_cols = df.select_dtypes(include='number').columns
+# 7 Recall vs dim:no_of_vectors (ef=200)
+plot_by_M_for_fixed_ef(
+    "dim_to_vec_ratio",
+    "recall@100",
+    200,
+    "Recall@100 vs (Dimensions / No. of Vectors) for efConstruction=200",
+    "recall_vs_dim_ratio_ef200.png",
+    "Dimensions : No. of Vectors Ratio",
+    "Recall@100"
+)
 
-avg_df = df.groupby(["M", "efConstruction"], as_index=False)[numeric_cols].mean()
+# 8 Recall vs dim:no_of_vectors (ef=100)
+plot_by_M_for_fixed_ef(
+    "dim_to_vec_ratio",
+    "recall@100",
+    100,
+    "Recall@100 vs (Dimensions / No. of Vectors) for efConstruction=100",
+    "recall_vs_dim_ratio_ef100.png",
+    "Dimensions : No. of Vectors Ratio",
+    "Recall@100"
+)
 
+# 9 Construction Time vs dim:no_of_vectors (ef=200)
+plot_by_M_for_fixed_ef(
+    "dim_to_vec_ratio",
+    "construction_time(ms)",
+    200,
+    "Construction Time vs (Dimensions / No. of Vectors) for efConstruction=200",
+    "construction_time_vs_dim_ratio_ef200.png",
+    "Dimensions : No. of Vectors Ratio",
+    "Construction Time (ms)"
+)
 
-# Plot: Average Recall@100 vs. M
-plt.figure(figsize=(10, 6))
-sns.lineplot(data=avg_df, x="M", y="recall@100", hue="efConstruction", marker="o")
-plt.title("Average Recall@100 vs. M (Across All Datasets)")
-plt.xlabel("M")
-plt.ylabel("Average Recall@100")
-plt.legend(title="efConstruction")
-plt.tight_layout()
-plt.savefig(f"{output_dir}/average_recall_vs_M.png")
-plt.close()
+# 10 Construction Time vs dim:no_of_vectors (ef=100)
+plot_by_M_for_fixed_ef(
+    "dim_to_vec_ratio",
+    "construction_time(ms)",
+    100,
+    "Construction Time vs (Dimensions / No. of Vectors) for efConstruction=100",
+    "construction_time_vs_dim_ratio_ef100.png",
+    "Dimensions : No. of Vectors Ratio",
+    "Construction Time (ms)"
+)
 
-# Plot: Average Construction Time vs. M
-plt.figure(figsize=(10, 6))
-sns.lineplot(data=avg_df, x="M", y="construction_time(ms)", hue="efConstruction", marker="o")
-plt.title("Average Construction Time vs. M (Across All Datasets)")
-plt.xlabel("M")
-plt.ylabel("Average Construction Time (ms)")
-plt.legend(title="efConstruction")
-plt.tight_layout()
-plt.savefig(f"{output_dir}/average_construction_time_vs_M.png")
-plt.close()
+# 11 Query Time vs dim:no_of_vectors (ef=100)
+plot_by_M_for_fixed_ef(
+    "dim_to_vec_ratio",
+    "query_time(ms)",
+    100,
+    "Query Time vs (Dimensions / No. of Vectors) for efConstruction=100",
+    "query_time_vs_dim_ratio_ef100.png",
+    "Dimensions : No. of Vectors Ratio",
+    "Query Time (ms)"
+)
 
-# Plot: Average Query Time vs. M
-plt.figure(figsize=(10, 6))
-sns.lineplot(data=avg_df, x="M", y="query_time(ms)", hue="efConstruction", marker="o")
-plt.title("Average Query Time vs. M (Across All Datasets)")
-plt.xlabel("M")
-plt.ylabel("Average Query Time (ms)")
-plt.legend(title="efConstruction")
-plt.tight_layout()
-plt.savefig(f"{output_dir}/average_query_time_vs_M.png")
-plt.close()
+# 12 Query Time vs dim:no_of_vectors (ef=200)
+plot_by_M_for_fixed_ef(
+    "dim_to_vec_ratio",
+    "query_time(ms)",
+    200,
+    "Query Time vs (Dimensions / No. of Vectors) for efConstruction=200",
+    "query_time_vs_dim_ratio_ef200.png",
+    "Dimensions : No. of Vectors Ratio",
+    "Query Time (ms)"
+)
 
-# Plot: Average Recall vs. Average Construction Time
-plt.figure(figsize=(10, 6))
-sns.scatterplot(data=avg_df, x="construction_time(ms)", y="recall@100", hue="M", style="efConstruction", s=100)
-plt.title("Average Recall@100 vs. Average Construction Time (Across All Datasets)")
-plt.xlabel("Average Construction Time (ms)")
-plt.ylabel("Average Recall@100")
-plt.legend(title="M / efConstruction", bbox_to_anchor=(1.05, 1), loc="upper left")
-plt.tight_layout()
-plt.savefig(f"{output_dir}/average_recall_vs_construction_time.png")
-plt.close()
-
-print(f"Graphs saved in folder '{output_dir}'")
+print("✅ All graphs generated and saved in the 'graphs' folder.")
