@@ -203,12 +203,29 @@ void compute_cluster_probabilities(const float* query, const gmm_params_t* gmm, 
     for (uint32_t k = 0; k < K; k++) probs[k] /= (sum_p + EPSILON);
 }
 
+// After GMM training, save GMM parameters
+void save_gmm_params(const char* filename, float** means, float* weights, uint32_t dim, float variance) {
+    FILE* f = fopen(filename, "wb");
+    if (!f) { perror("fopen"); return; }
+
+    fwrite(&dim, sizeof(uint32_t), 1, f);
+    fwrite(&variance, sizeof(float), 1, f);
+    fwrite(weights, sizeof(float), K, f);
+    for (uint32_t k = 0; k < K; k++) {
+        fwrite(means[k], sizeof(float), dim, f);
+    }
+
+    fclose(f);
+    printf("Saved GMM params to %s\n", filename);
+}
+
 
 int main(int argc, char** argv) {
     if (argc != 2) {
         printf("Usage: %s <quantised_dataset.5bit>\n", argv[0]);
         return 1;
     }
+    char gmm_filename[512];
     clock_t start = clock();
     const char* in_filename = argv[1];
     header_t header;
@@ -241,6 +258,12 @@ int main(int argc, char** argv) {
              strrchr(in_filename, '/') + 1 : in_filename);
     
     save_index(out_filename, cluster_ids, header.n, header.dim);
+
+    snprintf(gmm_filename, sizeof(gmm_filename),
+         "gmm_indexes/%s.gmm", strrchr(in_filename, '/') ?
+         strrchr(in_filename, '/') + 1 : in_filename);
+
+    save_gmm_params(gmm_filename, means, weights, header.dim, 1.0f);
 
     // Free
     free_2d(data, header.n);

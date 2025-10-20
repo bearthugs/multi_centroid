@@ -4,3 +4,4 @@ fvecs_data/
 *.txt
 reduced_data/
 quantised_data/
+*.gmm
