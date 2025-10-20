@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include "quant_functions.h"
+#include "../quant_functions.h"
+
+// gcc -o tests/test_mse tests/test_quant_error.c quant_functions.c -lm
 
 float* read_fvecs(const char* filename, uint32_t* n, uint32_t* dim);
 
@@ -28,7 +30,8 @@ float compute_mse(const float* a, const float* b, uint32_t size) {
         double diff = a[i] - b[i];
         mse += diff * diff;
     }
-    return (float)(mse / size);
+    return (float)(sqrt(mse / size));
+    //return (float)(mse / size);
 }
 
 int main() {
@@ -62,6 +65,14 @@ int main() {
 
     const size_t num_files = sizeof(input_files) / sizeof(input_files[0]);
 
+    // === Create CSV file ===
+    FILE* csv = fopen("tests/quantisation_stats.csv", "w");
+    if (!csv) {
+        fprintf(stderr, "Error: could not create quantisation_stats.csv\n");
+        return 1;
+    }
+    fprintf(csv, "dataset,n,dim,min_val,max_val,range,mse\n"); // CSV header
+
     for (size_t i = 0; i < num_files; i++) {
         uint32_t n, dim;
 
@@ -88,19 +99,36 @@ int main() {
             continue;
         }
 
+        // Print and compute range
+        float range = header.max_val - header.min_val;
+        printf("File %s: n=%u, dim=%u, min_val=%f, max_val=%f, range=%f\n",
+                packed_files[i], header.n, header.dim,
+                header.min_val, header.max_val, range);
+
         // Unpack
         float* unpacked = (float*)malloc(n * dim * sizeof(float));
         unpack_5bit(packed, n, dim, header.min_val, header.max_val, unpacked);
 
         // Compute error
         float mse = compute_mse(original, unpacked, n * dim);
-        printf("File: %s\n", input_files[i]);
-        printf("MSE between original and unpacked: %f\n", mse);
+        printf("sqrt(MSE) between original and unpacked: %f\n", mse);
 
+        // === Write to CSV ===
+        // Extract dataset name (just filename without path)
+        const char* dataset_name = strrchr(packed_files[i], '/');
+        dataset_name = dataset_name ? dataset_name + 1 : packed_files[i];
+
+        fprintf(csv, "%s,%u,%u,%f,%f,%f,%f\n",
+                dataset_name, header.n, header.dim,
+                header.min_val, header.max_val, range, mse);
+
+        // Cleanup
         free(original);
         free(packed);
         free(unpacked);
     }
 
+    fclose(csv);
+    printf("\nSaved results to tests/quantisation_stats.csv\n");
     return 0;
 }

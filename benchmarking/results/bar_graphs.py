@@ -53,4 +53,6 @@ for ef in ef_values:
         plt.savefig(f"bar_graphs/construction_time_dataset_M{M_val}_ef{ef}.png")
         plt.close()
 
+
+
 print("✅ Horizontal bar plots ordered by ascending dim*vec saved for each M and efConstruction.")

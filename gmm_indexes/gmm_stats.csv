@@ -1,0 +1,12 @@
+dataset,vectors,dimension,size(KB),hnsw_index_size(M=8)(efConstruction=100)(KB),construction_time(s)
+coco-i2i-512-angular,113287,100,443,235520,2.82
+fashion-mnist-784-euclidean,60000,100,234,188544,1.43
+gist-960-euclidean,1000000,100,3891.2,3879808,24.92
+glove-25-angular,1183514,25,4608,208512,13.04
+glove-50-angular,1183514,50,4608,325072,19.34
+glove-100-angular,1183514,100,4608,555264,31.77
+glove-200-angular,1183514,100,4608,1017760,29.51
+lastfm-64-dot,292385,64,1126.4,97120,4.78
+mnist-784-euclidean,60000,100,234,188544,1.41
+nytimes-256-angular,290000, 100,1126.4,312080,7.27
+sift-128-euclidean,1000000,100,3891.2,578125,23.53
