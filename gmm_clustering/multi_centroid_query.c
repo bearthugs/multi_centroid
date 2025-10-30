@@ -1,135 +1,168 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
-#include <float.h>
-#include <math.h>
-#include "utils.h"              // <-- includes your quantized distance functions
-#include "multi_centroid_query.h"     // <-- header declaration (see below)
+#include <stdint.h>
+#include <string.h>
+#include "../quant_functions.h"
+#include "utils.h"  // reduce_vector_with_svd, quantise_vector_5bit, get_top_clusters
 
-// Maximum clusters allowed to be searched
-#define MAX_CLUSTER_SEARCH 100
+#define TOP_K_NEIGHBORS 100
+#define TOP_CLUSTERS 3
 
-// -----------------------------
-// Data structures
-// -----------------------------
+/*
+COMPILING:
+    gcc -O2 gmm_clustering/multi_centroid_query.c gmm_clustering/utils.c quant_functions.c -lm -o multi_centroid_query
 
-typedef struct {
-    int id;
-    float dist;
-} Neighbor;
+./multi_centroid_query fvecs_data/coco-i2i-512-angular_test.fvecs reduced_data/coco-i2i-512-angular_train_svd_model.pkl gmm_indexes/coco-i2i-512-angular_train_reduced.gmm quantised_data/coco-i2i-512-angular_train_reduced.5bit gmm_indexes/coco-i2i-512-angular_train_reduced.5bit.index
 
-typedef struct {
-    Neighbor *items;
-    int size;
-    int capacity;
-} NeighborList;
+*/
 
-// -----------------------------
-// Helper functions
-// -----------------------------
+int main(int argc, char** argv) {
+    if (argc < 6) {
+        printf("Usage: %s <query_fvecs> <svd_model> <gmm_file> <packed_dataset> <cluster_index>\n", argv[0]);
+        return 1;
+    }
 
-static NeighborList *create_neighbor_list(int capacity) {
-    NeighborList *nl = malloc(sizeof(NeighborList));
-    nl->items = malloc(sizeof(Neighbor) * capacity);
-    nl->size = 0;
-    nl->capacity = capacity;
-    return nl;
-}
+    const char* query_file = argv[1];
+    const char* svd_model = argv[2];
+    const char* gmm_file = argv[3];
+    const char* packed_file = argv[4];
+    const char* cluster_index_file = argv[5];
 
-static void free_neighbor_list(NeighborList *nl) {
-    free(nl->items);
-    free(nl);
-}
+    // -----------------------
+    // Load queries
+    // -----------------------
+    uint32_t n_queries, dim_queries;
+    float** queries = read_fvecs_2d(query_file, &n_queries, &dim_queries);
+    if (!queries) return 1;
+    printf("Loaded %u queries of dimension %u\n", n_queries, dim_queries);
 
-static void add_neighbor(NeighborList *nl, int id, float dist) {
-    if (nl->size < nl->capacity) {
-        nl->items[nl->size++] = (Neighbor){id, dist};
-    } else {
-        // Find worst (farthest) neighbor
-        int worst = 0;
-        float max_dist = nl->items[0].dist;
-        for (int i = 1; i < nl->size; i++) {
-            if (nl->items[i].dist > max_dist) {
-                worst = i;
-                max_dist = nl->items[i].dist;
+    // -----------------------
+    // Load packed dataset
+    // -----------------------
+    header_t dataset_header;
+    uint8_t* packed_data = read_packed(packed_file, &dataset_header);
+    if (!packed_data) {
+        free(queries);
+        return 1;
+    }
+
+    // -----------------------
+    // Load cluster assignments
+    // -----------------------
+    FILE* f = fopen(cluster_index_file, "rb");
+    if (!f) {
+        perror("Failed to open cluster index file");
+        free(queries);
+        free(packed_data);
+        return 1;
+    }
+
+    uint32_t n_vectors, dim_index, K_clusters;
+    fread(&n_vectors, sizeof(uint32_t), 1, f);
+    fread(&dim_index, sizeof(uint32_t), 1, f);
+    fread(&K_clusters, sizeof(uint32_t), 1, f);
+
+    if (n_vectors != dataset_header.n) {
+        fprintf(stderr, "Cluster index count (%u) does not match dataset (%u)\n", n_vectors, dataset_header.n);
+        fclose(f);
+        free(queries);
+        free(packed_data);
+        return 1;
+    }
+
+    uint32_t* cluster_ids = (uint32_t*)malloc(n_vectors * sizeof(uint32_t));
+    fread(cluster_ids, sizeof(uint32_t), n_vectors, f);
+    fclose(f);
+
+    // -----------------------
+    // Precompute vectors per cluster
+    // -----------------------
+    uint32_t* cluster_counts = (uint32_t*)calloc(K_clusters, sizeof(uint32_t));
+    for (uint32_t i = 0; i < n_vectors; i++)
+        cluster_counts[cluster_ids[i]]++;
+
+    uint32_t** cluster_members = (uint32_t**)malloc(K_clusters * sizeof(uint32_t*));
+    for (uint32_t k = 0; k < K_clusters; k++)
+        cluster_members[k] = (uint32_t*)malloc(cluster_counts[k] * sizeof(uint32_t));
+
+    // Fill members
+    uint32_t* filled = (uint32_t*)calloc(K_clusters, sizeof(uint32_t));
+    for (uint32_t i = 0; i < n_vectors; i++) {
+        uint32_t c = cluster_ids[i];
+        cluster_members[c][filled[c]++] = i;
+    }
+    free(filled);
+
+    // -----------------------
+    // Process queries
+    // -----------------------
+    for (uint32_t i = 0; i < n_queries; i++) {
+        float* qvec = queries[i];
+
+        // Reduce
+        float* reduced = reduce_vector_with_svd(qvec, dim_queries, svd_model);
+        if (!reduced) continue;
+
+        // Top clusters
+        uint32_t* top_clusters = get_top_clusters(reduced, dataset_header.dim,
+                                                  dataset_header.min_val,
+                                                  dataset_header.max_val,
+                                                  gmm_file,
+                                                  TOP_CLUSTERS);
+        if (!top_clusters) {
+            free(reduced);
+            continue;
+        }
+
+        float best_distances[TOP_K_NEIGHBORS];
+        uint32_t best_indices[TOP_K_NEIGHBORS];
+        for (uint32_t k = 0; k < TOP_K_NEIGHBORS; k++) {
+            best_distances[k] = 1e9;
+            best_indices[k] = UINT32_MAX;
+        }
+
+        // Search only vectors in top clusters
+        for (uint32_t c = 0; c < TOP_CLUSTERS; c++) {
+            uint32_t cluster_id = top_clusters[c];
+            for (uint32_t j = 0; j < cluster_counts[cluster_id]; j++) {
+                uint32_t idx = cluster_members[cluster_id][j];
+                float dist = distance(packed_data, idx, i, &dataset_header, DIST_EUCLIDEAN);
+
+                // Insert into sorted top-K
+                for (uint32_t k = 0; k < TOP_K_NEIGHBORS; k++) {
+                    if (dist < best_distances[k]) {
+                        for (uint32_t l = TOP_K_NEIGHBORS - 1; l > k; l--) {
+                            best_distances[l] = best_distances[l - 1];
+                            best_indices[l] = best_indices[l - 1];
+                        }
+                        best_distances[k] = dist;
+                        best_indices[k] = idx;
+                        break;
+                    }
+                }
             }
         }
-        if (dist < max_dist) {
-            nl->items[worst].id = id;
-            nl->items[worst].dist = dist;
+
+        // Output
+        printf("Query %u top-%u neighbors:\n", i, TOP_K_NEIGHBORS);
+        for (uint32_t k = 0; k < TOP_K_NEIGHBORS; k++) {
+            printf("%u (%.4f) ", best_indices[k], best_distances[k]);
         }
-    }
-}
+        printf("\n");
 
-static int compare_neighbors(const void *a, const void *b) {
-    const Neighbor *na = (const Neighbor *)a;
-    const Neighbor *nb = (const Neighbor *)b;
-    return (na->dist > nb->dist) - (na->dist < nb->dist);
-}
-
-// -----------------------------
-// Main search function
-// -----------------------------
-
-NeighborList *cluster_search_quantized(
-    const uint8_t *query,                    // quantized query vector
-    int query_dim,
-    int num_clusters,
-    const float *query_probs,                // length = num_clusters
-    const Cluster *clusters,                 // your cluster array
-    int k,
-    float threshold
-) {
-    // 1. Identify the top cluster
-    int top_cluster = 0;
-    float max_prob = -1.0f;
-    for (int i = 0; i < num_clusters; i++) {
-        if (query_probs[i] > max_prob) {
-            max_prob = query_probs[i];
-            top_cluster = i;
-        }
+        free(reduced);
+        free(top_clusters);
     }
 
-    NeighborList *neighbors = create_neighbor_list(k);
-    bool searched[num_clusters];
-    for (int i = 0; i < num_clusters; i++) searched[i] = false;
-    searched[top_cluster] = true;
+    // -----------------------
+    // Cleanup
+    // -----------------------
+    free(queries);
+    free(packed_data);
+    free(cluster_ids);
+    free(cluster_counts);
+    for (uint32_t k = 0; k < K_clusters; k++) free(cluster_members[k]);
+    free(cluster_members);
 
-    int searched_count = 1;
-
-    // 2. Search primary cluster
-    for (int i = 0; i < clusters[top_cluster].size; i++) {
-        float dist = quantized_distance(query, clusters[top_cluster].vectors[i], query_dim);
-        add_neighbor(neighbors, clusters[top_cluster].ids[i], dist);
-    }
-
-    // 3. Determine secondary clusters based on neighbour probabilities
-    bool cluster_to_search[num_clusters];
-    for (int i = 0; i < num_clusters; i++) cluster_to_search[i] = false;
-
-    for (int n = 0; n < neighbors->size; n++) {
-        int id = neighbors->items[n].id;
-        const float *probs = clusters->vector_probs[id]; // You should have this per-vector
-        for (int c = 0; c < num_clusters; c++) {
-            if (c != top_cluster && probs[c] > threshold)
-                cluster_to_search[c] = true;
-        }
-    }
-
-    // 4. Search secondary clusters (early stopping at 100 clusters total)
-    for (int c = 0; c < num_clusters && searched_count < MAX_CLUSTER_SEARCH; c++) {
-        if (!cluster_to_search[c] || searched[c]) continue;
-        searched[c] = true;
-        searched_count++;
-
-        for (int i = 0; i < clusters[c].size; i++) {
-            float dist = quantized_distance(query, clusters[c].vectors[i], query_dim);
-            add_neighbor(neighbors, clusters[c].ids[i], dist);
-        }
-    }
-
-    // 5. Sort final neighbor list by distance
-    qsort(neighbors->items, neighbors->size, sizeof(Neighbor), compare_neighbors);
-
-    return neighbors;
+    return 0;
 }

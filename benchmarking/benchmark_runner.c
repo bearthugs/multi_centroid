@@ -54,8 +54,8 @@ void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors
     double t0 = 0;
     double t_build = 0;
 
-    int M = 128;
-    int efConstruction = 200;
+    int M = 64;
+    int efConstruction = 100;
 
     int d_base, n_base;
     float* base_vectors = load_fvecs(base_vectors_file, &n_base, &d_base);
@@ -76,19 +76,19 @@ void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors
         return;
     }
 
-    mkdir("results/results_M128_efC200", 0777);
+    mkdir("sorted_results/results_M64_efC100", 0777);
 
-    FILE* csv = fopen("./results/results_M128_efC200/benchmark_results.csv", "w");
+    FILE* csv = fopen("./sorted_results/results_M64_efC100/benchmark_results.csv", "w");
     if (!csv) {
         perror("Failed to open CSV file");
         return;
     }
 
-    fprintf(csv, "dataset,construction_time(ms),query_time(ms),recall@100,M,efConstruction\n");
+    //fprintf(csv, "dataset,construction_time(ms),query_time(ms),recall@100,M,efConstruction\n");
 
     get_dataset_name(query_vectors_file, dataset_name, sizeof(dataset_name));
 
-    snprintf(index_filename, sizeof(index_filename), "./results/results_M128_efC200/%s_hnsw.index", dataset_name);
+    snprintf(index_filename, sizeof(index_filename), "./sorted_results/results_M64_efC100/%s_hnsw.index", dataset_name);
 
     // 1. Index build (construction overhead)
     if (stat(index_filename, &st) == 0) {
@@ -138,13 +138,14 @@ void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors
             M,
             efConstruction);
     
+    
     // 5. Sweep for target recalls
     double targets[] = {0.99};
     for (int ti = 0; ti < 1; ti++) {
         double target = targets[ti];
         printf("\n--- Benchmark for target recall %.2f ---\n", target);
 
-        for (int ef = 10; ef <= 300; ef += 10) {
+        for (int ef = 200; ef <= 200; ef += 1) {
             faiss_hnsw_set_efSearch(index, ef);
 
             double t0 = wall_time();

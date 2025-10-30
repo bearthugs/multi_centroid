@@ -113,7 +113,7 @@ uint8_t* quantise_vector_5bit(const float* vec, uint32_t dim, float min_val, flo
  *   - reduced_vec: the SVD-reduced float vector (e.g. 100 dims)
  *   - dim: number of dimensions after reduction
  *   - min_val, max_val: normalisation values (same used for quantisation)
- *   - gmm: pointer to the preloaded GMM parameters
+ *   - gmm_filename: path to the precomputed .gmm file
  *   - top_k: how many top clusters to return (<= K)
  *
  * Output:
@@ -122,19 +122,51 @@ uint8_t* quantise_vector_5bit(const float* vec, uint32_t dim, float min_val, flo
  */
 uint32_t* get_top_clusters(const float* reduced_vec, uint32_t dim,
                            float min_val, float max_val,
-                           const gmm_params_t* gmm, uint32_t top_k)
+                           const char* gmm_filename, uint32_t top_k)
 {
-    if (!reduced_vec || !gmm || top_k == 0) return NULL;
+    if (!reduced_vec || !gmm_filename || top_k == 0) return NULL;
 
-    // Step 1: quantise vector (so we use same scaling as training)
+    // -----------------------
+    // Step 0: Load GMM file
+    // -----------------------
+    FILE* f = fopen(gmm_filename, "rb");
+    if (!f) {
+        perror("Failed to open GMM file");
+        return NULL;
+    }
+
+    uint32_t gmm_dim;
+    float variance;
+    float weights[K];
+    float means[K][100]; // assumes dim <= 100
+
+    fread(&gmm_dim, sizeof(uint32_t), 1, f);
+    fread(&variance, sizeof(float), 1, f);
+    fread(weights, sizeof(float), K, f);
+    for (uint32_t k = 0; k < K; k++) {
+        fread(means[k], sizeof(float), gmm_dim, f);
+    }
+    fclose(f);
+
+    // Build gmm_params_t struct
+    gmm_params_t gmm;
+    gmm.dim = gmm_dim;
+    gmm.variance = variance;
+    memcpy(gmm.weights, weights, sizeof(weights));
+    memcpy(gmm.means, means, sizeof(means));
+
+    // -----------------------
+    // Step 1: Quantise query vector
+    // -----------------------
     uint8_t* qvec = quantise_vector_5bit(reduced_vec, dim, min_val, max_val);
     if (!qvec) {
         fprintf(stderr, "Error: quantisation failed in get_top_clusters\n");
         return NULL;
     }
 
-    // Step 2: dequantise it back to float for GMM probability computation
-    // (we keep it consistent with how GMM was trained on dequantised data)
+    // -----------------------
+    // Step 2: Dequantise for probability computation
+    // -----------------------
     float* dq = (float*)calloc(dim, sizeof(float));
     float range = max_val - min_val;
     if (range <= 1e-9f) range = 1.0f;
@@ -152,12 +184,16 @@ uint32_t* get_top_clusters(const float* reduced_vec, uint32_t dim,
     }
     free(qvec);
 
-    // Step 3: compute cluster probabilities
+    // -----------------------
+    // Step 3: Compute cluster probabilities
+    // -----------------------
     float probs[K];
-    compute_cluster_probabilities(dq, gmm, probs);
+    compute_cluster_probabilities(dq, &gmm, probs);
     free(dq);
 
-    // Step 4: find top-K cluster indices by descending probability
+    // -----------------------
+    // Step 4: Select top-K clusters
+    // -----------------------
     uint32_t* top_clusters = (uint32_t*)malloc(top_k * sizeof(uint32_t));
     float temp_probs[K];
     memcpy(temp_probs, probs, sizeof(float) * K);
@@ -171,7 +207,7 @@ uint32_t* get_top_clusters(const float* reduced_vec, uint32_t dim,
         temp_probs[best] = -1.0f; // mark as used
     }
 
-    // (Optional) Print results for debugging
+    // Optional debug
     printf("Top %u clusters: ", top_k);
     for (uint32_t i = 0; i < top_k; i++) {
         printf("%u (%.4f) ", top_clusters[i], probs[top_clusters[i]]);
@@ -179,4 +215,108 @@ uint32_t* get_top_clusters(const float* reduced_vec, uint32_t dim,
     printf("\n");
 
     return top_clusters;
+}
+
+
+/**
+ * Read an .fvecs file into a 2D float array.
+ * 
+ * Inputs:
+ *   - filename: path to the .fvecs file
+ *   - out_n: pointer to uint32_t to store the number of vectors
+ *   - out_dim: pointer to uint32_t to store the dimension of each vector
+ * 
+ * Returns:
+ *   - malloc'd float** array (each row is a vector). Caller must free each row and the array.
+ *   - On error, returns NULL and sets out_n and out_dim to 0.
+ */
+float** read_fvecs_2d(const char* filename, uint32_t* out_n, uint32_t* out_dim) {
+    if (!filename || !out_n || !out_dim) return NULL;
+
+    *out_n = 0;
+    *out_dim = 0;
+
+    FILE* f = fopen(filename, "rb");
+    if (!f) {
+        perror("Failed to open .fvecs file");
+        return NULL;
+    }
+
+    // Determine file size
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    // Read first vector to get dimension
+    uint32_t dim;
+    if (fread(&dim, sizeof(uint32_t), 1, f) != 1) {
+        perror("Failed to read vector dimension");
+        fclose(f);
+        return NULL;
+    }
+
+    // Compute total number of vectors
+    size_t vec_bytes = sizeof(uint32_t) + dim * sizeof(float);
+    uint32_t n = fsize / vec_bytes;
+
+    // Allocate array
+    float** data = (float**)malloc(n * sizeof(float*));
+    if (!data) {
+        fprintf(stderr, "Memory allocation failed for read_fvecs\n");
+        fclose(f);
+        return NULL;
+    }
+
+    // Read all vectors
+    fseek(f, 0, SEEK_SET);
+    for (uint32_t i = 0; i < n; i++) {
+        uint32_t d;
+        if (fread(&d, sizeof(uint32_t), 1, f) != 1) {
+            fprintf(stderr, "Failed to read vector %u dimension\n", i);
+            n = i;
+            break;
+        }
+        if (d != dim) {
+            fprintf(stderr, "Dimension mismatch at vector %u\n", i);
+            n = i;
+            break;
+        }
+
+        data[i] = (float*)malloc(dim * sizeof(float));
+        if (fread(data[i], sizeof(float), dim, f) != dim) {
+            fprintf(stderr, "Failed to read vector %u data\n", i);
+            n = i;
+            break;
+        }
+    }
+
+    fclose(f);
+    *out_n = n;
+    *out_dim = dim;
+    return data;
+}
+
+/**
+ * Helper to free the 2D float array returned by read_fvecs.
+ */
+void free_fvecs(float** data, uint32_t n) {
+    if (!data) return;
+    for (uint32_t i = 0; i < n; i++) free(data[i]);
+    free(data);
+}
+
+void compute_cluster_probabilities(const float* query, const gmm_params_t* gmm, float* probs) {
+    float var = gmm->variance;
+    float sum_p = 0.0f;
+    for (uint32_t k = 0; k < K; k++) {
+        float dist = 0.0f;
+        for (uint32_t d = 0; d < gmm->dim; d++) {
+            float diff = query[d] - gmm->means[k][d];
+            dist += diff * diff;
+        }
+        float p = gmm->weights[k] * expf(-0.5f * dist / var);
+        probs[k] = p;
+        sum_p += p;
+    }
+    for (uint32_t k = 0; k < K; k++) probs[k] /= (sum_p + EPSILON);
 }

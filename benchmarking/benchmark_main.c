@@ -5,9 +5,12 @@ void run_benchmark_hnsw(const char*, const char*, const char*, int, int);
 int main() {
     int k = 100;
 
+    printf("\n\n\n\n\n");
+
     const char* base_path = "../fvecs_data/coco-i2i-512-angular_train.fvecs";
     const char* query_path = "../fvecs_data/coco-i2i-512-angular_test.fvecs";
     const char* neighbour_path = "../fvecs_data/coco-i2i-512-angular_neighbours.ivecs";
+    /*
     printf("Dataset: coco-i2i-512-angular\n");
     run_benchmark_hnsw(base_path, query_path, neighbour_path, k, 1);
     printf("\n\n\n\n\n");
@@ -26,14 +29,15 @@ int main() {
     run_benchmark_hnsw(base_path, query_path, neighbour_path, k, 0);
     printf("\n\n\n\n\n");
 
-    
+*/
     base_path = "../fvecs_data/gist-960-euclidean_train.fvecs";
     query_path = "../fvecs_data/gist-960-euclidean_test.fvecs";
     neighbour_path = "../fvecs_data/gist-960-euclidean_neighbours.ivecs";
     printf("Dataset: gist-960-euclidean\n");
     run_benchmark_hnsw(base_path, query_path, neighbour_path, k, 0);
     printf("\n\n\n\n\n");
-
+/*
+    
     base_path = "../fvecs_data/glove-25-angular_train.fvecs";
     query_path = "../fvecs_data/glove-25-angular_test.fvecs";
     neighbour_path = "../fvecs_data/glove-25-angular_neighbours.ivecs";
@@ -89,6 +93,7 @@ int main() {
     printf("Dataset: sift-128-euclidean\n");
     run_benchmark_hnsw(base_path, query_path, neighbour_path, k, 0);
     printf("\n\n\n\n\n");
+    */
     
     return 0;
 }
