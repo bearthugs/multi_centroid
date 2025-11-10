@@ -36,6 +36,21 @@
     ./gmm_analysis gmm_indexes/gmm/mnist-784-euclidean_train_reduced.gmm
     ./gmm_analysis gmm_indexes/gmm/nytimes-256-angular_train_reduced.gmm
     ./gmm_analysis gmm_indexes/gmm/sift-128-euclidean_train_reduced.gmm
+
+
+    ./gmm_analysis gmm_indexes/gmm/coco-i2i-512-angular_train_reduced.gmm
+    ./gmm_analysis gmm_indexes/gmm/glove-25-angular_train_reduced.gmm
+    ./gmm_analysis gmm_indexes/gmm/glove-50-angular_train_reduced.gmm
+    ./gmm_analysis gmm_indexes/gmm/glove-100-angular_train_reduced.gmm
+    ./gmm_analysis gmm_indexes/gmm/glove-200-angular_train_reduced.gmm
+    ./gmm_analysis gmm_indexes/gmm/lastfm-64-dot_train_reduced.gmm
+    ./gmm_analysis gmm_indexes/gmm/nytimes-256-angular_train_reduced.gmm
+
+
+    ./gmm_analysis gmm_indexes/gmm/fashion-mnist-784-euclidean_train_reduced.gmm
+    ./gmm_analysis gmm_indexes/gmm/gist-960-euclidean_train_reduced.gmm
+    ./gmm_analysis gmm_indexes/gmm/mnist-784-euclidean_train_reduced.gmm
+    ./gmm_analysis gmm_indexes/gmm/sift-128-euclidean_train_reduced.gmm
 */
 
 #include <stdio.h>

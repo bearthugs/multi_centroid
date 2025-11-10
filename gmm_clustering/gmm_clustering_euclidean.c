@@ -6,10 +6,10 @@
 // - Cosine mode:     L2-normalised vectors; EM runs in that space (typical).
 //
 // COMPILING (example):
-//   gcc -O2 gmm_clustering/gmm_clustering.c 5bit_quantisation/quant_functions.c -lm -o gmm_cluster
+//   gcc -O2 gmm_clustering/gmm_clustering_euclidean.c 5bit_quantisation/quant_functions.c -lm -o gmm_cluster_euclidean
 //
 // RUNNING:
-//   ./gmm_cluster
+//   ./gmm_cluster_euclidean
 //
 // OUTPUT (per dataset; basename = file name without path/extension):
 //   gmm_indexes/vector_to_cluster/<basename>.index    // line i: "<i> <argmax_k r_ik>"
@@ -66,9 +66,9 @@ static const char* SUMMARY_CSV_PATH = "analysis_results/training_summary.csv";
 #define EM_MAX_ITERS          50       // hard cap
 #define EM_LIKELIHOOD_TOL     1e-4f    // relative improvement tolerance
 #define INIT_KMEANSPP_FAR_FIRST 1      // deterministic farthest-first kmeans++
-#define EMPTY_THRESHOLD     0.5f        // consider cluster empty if Nk < 0.5
-#define SPLIT_THRESHOLD     2.0f        // split if Nk > SPLIT_THRESHOLD * average cluster size
-#define PERTURB_SCALE       0.05f       // small random shift when splitting
+#define EMPTY_THRESHOLD     1.0f        // consider cluster empty if Nk < 0.5, 0.8 for MNIST 1 otherwise
+#define SPLIT_THRESHOLD     1.5f        // split if Nk > SPLIT_THRESHOLD * average cluster size, 1.2 for MNIST and GIST 1.5 otherwise
+#define PERTURB_SCALE       0.03f       // small random shift when splitting
 
 // Variance regularisation
 #define GLOBAL_VAR_FRACTION_FLOOR  1e-6f   // add this * global_var to each variance dim
@@ -93,16 +93,25 @@ typedef struct {
     distance_type_t metric; // DIST_EUCLIDEAN or DIST_COSINE
 } dataset_spec_t;
 
-// Example list — edit to your files
+
 static dataset_spec_t datasets[] = {
-    { "quantised_data/train/coco-i2i-512-angular_train_reduced.5bit",       DIST_COSINE     },
-    { "quantised_data/train/glove-25-angular_train_reduced.5bit",       DIST_COSINE     },
-    { "quantised_data/train/glove-50-angular_train_reduced.5bit",       DIST_COSINE     },
-    { "quantised_data/train/glove-100-angular_train_reduced.5bit",          DIST_COSINE     },
-    { "quantised_data/train/glove-200-angular_train_reduced.5bit",          DIST_COSINE     },
-    { "quantised_data/train/lastfm-64-dot_train_reduced.5bit",          DIST_COSINE     },
-    { "quantised_data/train/nytimes-256-angular_train_reduced.5bit",          DIST_COSINE     }
+    { "quantised_data/train/mnist-784-euclidean_train_reduced.5bit",          DIST_EUCLIDEAN     },
+    { "quantised_data/train/gist-960-euclidean_train_reduced.5bit",          DIST_EUCLIDEAN     },
+    { "quantised_data/train/fashion-mnist-784-euclidean_train_reduced.5bit",          DIST_EUCLIDEAN     },
+    { "quantised_data/train/sift-128-euclidean_train_reduced.5bit",          DIST_EUCLIDEAN     }
 };
+
+/*
+static dataset_spec_t datasets[] = {
+    { "quantised_data/train/gist-960-euclidean_train_reduced.5bit",          DIST_EUCLIDEAN     }
+};
+
+
+static dataset_spec_t datasets[] = {
+    { "quantised_data/train/fashion-mnist-784-euclidean_train_reduced.5bit",          DIST_EUCLIDEAN     },
+    { "quantised_data/train/sift-128-euclidean_train_reduced.5bit",          DIST_EUCLIDEAN     }
+};
+*/
 
 //================ Path helpers =================
 
@@ -203,7 +212,7 @@ static float dist_idx_center_normpolicy(const uint8_t* packed, const header_t* h
     float* v = (float*)malloc(sizeof(float)*dim);
     if (!v) return 0.0f;
     unpack_dequantise_vector(packed, h, idx, v);
-    if (metric == DIST_COSINE) l2_normalise(v, dim);
+    l2_normalise(v, dim);
 
     double acc=0.0;
     if (metric == DIST_EUCLIDEAN) {
@@ -358,7 +367,7 @@ static uint32_t farthest_point_index(const uint8_t* packed, const header_t* h,
     uint32_t best_idx = 0;
     for (uint32_t i = 0; i < n; i += (n / 500 + 1)) {  // sample subset for efficiency
         unpack_dequantise_vector(packed, h, i, tmp);
-        if (metric == DIST_COSINE) l2_normalise(tmp, dim);
+        l2_normalise(tmp, dim);
 
         double min_dist = DBL_MAX;
         for (int k = 0; k < K; ++k) {
@@ -386,6 +395,7 @@ static void maintain_cluster_balance(float* weights, float* means, float* varian
                                      distance_type_t metric, float* var_floor)
 {
     // ---- Adaptive variance floor ----
+    if (*var_floor < 1e-4f) *var_floor = 1e-4f;
     *var_floor *= 1.2f;        // increase variance 20% per EM cycle
     if (*var_floor > 1e-1f)    // allow up to 0.1
         *var_floor = 1e-1f;
@@ -441,13 +451,8 @@ static void maintain_cluster_balance(float* weights, float* means, float* varian
         }
     }
 
-    if (performed_split == 0)
-        return;
-    
-    if (metric == DIST_COSINE) {
-        for (int k = 0; k < K; ++k)
-            l2_normalise(&means[k * dim], dim);
-    }
+    for (int k = 0; k < K; ++k)
+        l2_normalise(&means[k * dim], dim);    
 
     // ---- 3. Normalise weights ----
     float sumw = 0.0f;
@@ -470,6 +475,7 @@ static void reinitialise_degenerate_clusters(const uint8_t* packed, const header
     }
     global_var /= (float)(K * dim);
     if (global_var <= 0.0f) global_var = 1e-6f;
+    if (global_var < 1e-3f) global_var = 1e-3f;
 
     for (int k = 0; k < K; ++k) {
         int degenerate = 0;
@@ -525,7 +531,7 @@ static int em_gmm(const uint8_t* packed, const header_t* h,
 {
     const uint32_t n   = h->n;
     const uint32_t dim = h->dim;
-    const int normalised = (metric == DIST_COSINE) ? 1 : 0;
+    const int normalised = 1;
 
     // ---------- Initialisation ----------
     // Means via kmeans++-style
@@ -711,6 +717,18 @@ static int em_gmm(const uint8_t* packed, const header_t* h,
             }
         }
 
+        /*
+        // prevent variance blow-up (for dense datasets like MNIST) FOR MNIST ONLY
+        const float VAR_CAP = 0.020f;   // adjust if needed
+        for (int k=0;k<K;++k) {
+            for (uint32_t d=0; d<dim; ++d) {
+                if (variances[k*dim+d] > VAR_CAP)
+                    variances[k*dim+d] = VAR_CAP;
+            }
+        }
+        */
+
+
         // update inv_var and log_consts for next E-step
         for (int k=0;k<K;++k) {
             double sum_log = 0.0;
@@ -835,7 +853,7 @@ static int process_dataset(const char* filepath, distance_type_t metric) {
 
     // Write .gmm
     char p_gmm[1024]; snprintf(p_gmm, sizeof(p_gmm), "gmm_indexes/gmm/%s.gmm", base);
-    if (write_gmm_file(p_gmm, &h, metric, (metric==DIST_COSINE)?1:0, var_floor,
+    if (write_gmm_file(p_gmm, &h, metric, 1, var_floor,
                        weights, means, variances, log_consts) != 0) {
         fprintf(stderr, "Failed writing %s\n", p_gmm);
     } else {
@@ -858,7 +876,6 @@ static int process_dataset(const char* filepath, distance_type_t metric) {
     } else {
         fprintf(stderr, "Failed to write summary CSV: %s\n", SUMMARY_CSV_PATH);
     }
-
 
     free(log_consts);
     free(packed); free(weights); free(means); free(variances); free(argmax);
