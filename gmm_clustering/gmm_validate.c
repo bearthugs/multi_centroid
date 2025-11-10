@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <math.h>
 #include "utils.h"
-#include "../quant_functions.h"
+#include "../5bit_quantisation/quant_functions.h"
 
 /*
 COMPILING:

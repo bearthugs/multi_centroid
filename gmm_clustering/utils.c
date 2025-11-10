@@ -4,7 +4,7 @@
 #include <math.h>
 #include <string.h>
 #include "gmm_cluster_runner.h"
-#include "../quant_functions.h"  // for BIT_DEPTH, LEVELS
+#include "../5bit_quantisation/quant_functions.h"  // for BIT_DEPTH, LEVELS
 
 #define TOP_CLUSTERS 3  // number of clusters to return (can be changed)
 

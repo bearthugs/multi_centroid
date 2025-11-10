@@ -1,7 +1,7 @@
 #ifndef GMM_CLUSTER_RUNNER_H
 #define GMM_CLUSTER_RUNNER_H
 
-#include "../quant_functions.h"
+#include "../5bit_quantisation/quant_functions.h"
 
 #define K 64
 #define MAX_ITER 50

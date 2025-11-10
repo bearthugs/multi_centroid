@@ -3,7 +3,7 @@
 #include <math.h>
 #include <time.h>
 #include <string.h>
-#include "../quant_functions.h"
+#include "../5bit_quantisation/quant_functions.h"
 #include "gmm_cluster_runner.h"
 
 #define K 64                 // Number of GMM clusters

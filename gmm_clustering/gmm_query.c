@@ -3,7 +3,7 @@
 #include <math.h>
 #include <string.h>
 #include "utils.h"
-#include "../quant_functions.h"
+#include "../5bit_quantisation/quant_functions.h"
 #include "gmm_cluster_runner.h"
 
 #define DEFAULT_KNN 100

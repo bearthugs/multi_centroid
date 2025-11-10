@@ -4,6 +4,8 @@
         "math.h": "c",
         "stdio.h": "c",
         "quant_functions.h": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "gmm_cluster_runner.h": "c",
+        "utils.h": "c"
     }
 }

@@ -63,20 +63,19 @@ def reduce_dimensionality(input_path, output_folder, target_dim=100):
 # Example usage
 if __name__ == "__main__":
     train_files = [
-        "fvecs_data/coco-i2i-512-angular_train.fvecs",
-        "fvecs_data/deep-image-96-angular_train.fvecs",
-        "fvecs_data/fashion-mnist-784-euclidean_train.fvecs",
-        "fvecs_data/gist-960-euclidean_train.fvecs",
-        "fvecs_data/glove-25-angular_train.fvecs",
-        "fvecs_data/glove-50-angular_train.fvecs",
-        "fvecs_data/glove-100-angular_train.fvecs",
-        "fvecs_data/glove-200-angular_train.fvecs",
-        "fvecs_data/lastfm-64-dot_train.fvecs",
-        "fvecs_data/mnist-784-euclidean_train.fvecs",
-        "fvecs_data/nytimes-256-angular_train.fvecs",
-        "fvecs_data/sift-128-euclidean_train.fvecs",
+        "../fvecs_data/coco-i2i-512-angular_train.fvecs",
+        "../fvecs_data/fashion-mnist-784-euclidean_train.fvecs",
+        "../fvecs_data/gist-960-euclidean_train.fvecs",
+        "../fvecs_data/glove-25-angular_train.fvecs",
+        "../fvecs_data/glove-50-angular_train.fvecs",
+        "../fvecs_data/glove-100-angular_train.fvecs",
+        "../fvecs_data/glove-200-angular_train.fvecs",
+        "../fvecs_data/lastfm-64-dot_train.fvecs",
+        "../fvecs_data/mnist-784-euclidean_train.fvecs",
+        "../fvecs_data/nytimes-256-angular_train.fvecs",
+        "../fvecs_data/sift-128-euclidean_train.fvecs",
     ]
 
-    output_dir = "reduced_data"
+    output_dir = "../reduced_data/train"
     for train_file in train_files:
         reduce_dimensionality(train_file, output_dir, target_dim=100)
