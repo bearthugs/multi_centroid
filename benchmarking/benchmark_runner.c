@@ -54,8 +54,8 @@ void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors
     double t0 = 0;
     double t_build = 0;
 
-    int M = 64;
-    int efConstruction = 100;
+    int M = 16;
+    int efConstruction = 200;
 
     int d_base, n_base;
     float* base_vectors = load_fvecs(base_vectors_file, &n_base, &d_base);
@@ -76,9 +76,9 @@ void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors
         return;
     }
 
-    mkdir("sorted_results/results_M64_efC100", 0777);
+    mkdir("sorted_results/results_M16_efC200", 0777);
 
-    FILE* csv = fopen("./sorted_results/results_M64_efC100/benchmark_results.csv", "w");
+    FILE* csv = fopen("./sorted_results/results_M16_efC200/benchmark_results.csv", "w");
     if (!csv) {
         perror("Failed to open CSV file");
         return;
@@ -88,7 +88,7 @@ void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors
 
     get_dataset_name(query_vectors_file, dataset_name, sizeof(dataset_name));
 
-    snprintf(index_filename, sizeof(index_filename), "./sorted_results/results_M64_efC100/%s_hnsw.index", dataset_name);
+    snprintf(index_filename, sizeof(index_filename), "./sorted_results/results_M16_efC200/%s_hnsw.index", dataset_name);
 
     // 1. Index build (construction overhead)
     if (stat(index_filename, &st) == 0) {
@@ -140,12 +140,57 @@ void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors
     
     
     // 5. Sweep for target recalls
-    double targets[] = {0.99};
+    double target = 0.99;
+    printf("\n--- Interactive Benchmark for target recall %.2f ---\n", target);
+    printf("Enter efSearch values to test (or 'q' to quit)\n");
+
+    while (1) {
+        char input[32];
+        printf("\nefSearch = ");
+        if (fgets(input, sizeof(input), stdin) == NULL) break;
+
+        if (input[0] == 'q' || input[0] == 'Q') {
+            printf("Exiting interactive benchmark.\n");
+            break;
+        }
+
+        int ef = atoi(input);
+        if (ef <= 0) {
+            printf("Invalid efSearch value. Please enter a positive integer.\n");
+            continue;
+        }
+
+        faiss_hnsw_set_efSearch(index, ef);
+
+        double t0 = wall_time();
+        faiss_search(index, n_query, query_vectors, d_query, k, distances, labels);
+        double t_search = wall_time() - t0;
+
+        double recall = compute_recall_at_k(labels, n_query, k, gt, gt_k);
+
+        printf("efSearch=%d  recall=%.4f  query_time=%.3f s\n", ef, recall, t_search);
+        fprintf(csv, "%.2f,%d,%.4f,%.6f\n", target, ef, recall, t_search);
+
+        if (recall >= 0.90) {
+            printf("✅ Reached target recall 0.90 with efSearch=%d\n", ef);
+        }
+        if (recall >= 0.95) {
+            printf("✅ Reached target recall 0.95 with efSearch=%d\n", ef);
+        }
+        if (recall >= 0.99) {
+            printf("✅ Reached target recall 0.99 with efSearch=%d\n", ef);
+        }
+        if (recall >= 0.80) {
+            printf("✅ Reached target recall 0.80 with efSearch=%d\n", ef);
+        }
+    }
+    /*
+    double targets[] = {0.90};
     for (int ti = 0; ti < 1; ti++) {
         double target = targets[ti];
         printf("\n--- Benchmark for target recall %.2f ---\n", target);
 
-        for (int ef = 200; ef <= 200; ef += 1) {
+        for (int ef = 300; ef <= 100000; ef += 1) {
             faiss_hnsw_set_efSearch(index, ef);
 
             double t0 = wall_time();
@@ -165,6 +210,7 @@ void run_benchmark_hnsw(const char* base_vectors_file, const char* query_vectors
             }
         }
     }
+        */
     
     free(base_vectors);
     free(query_vectors);

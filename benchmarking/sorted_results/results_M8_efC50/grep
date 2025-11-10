@@ -1,0 +1,11 @@
+-rw-r--r--  1 claretian  staff   230M Oct 31 16:23 coco-i2i-512-angular_hnsw.index
+-rw-r--r--  1 claretian  staff   184M Oct 31 16:25 fashion-mnist-784-euclidean_hnsw.index
+-rw-r--r--  1 claretian  staff   3.7G Nov  2 12:17 gist-960-euclidean_hnsw.index
+-rw-r--r--  1 claretian  staff   542M Oct 31 03:19 glove-100-angular_hnsw.index
+-rw-r--r--  1 claretian  staff   994M Oct 27 21:11 glove-200-angular_hnsw.index
+-rw-r--r--  1 claretian  staff   204M Oct 31 16:33 glove-25-angular_hnsw.index
+-rw-r--r--  1 claretian  staff   317M Oct 31 16:35 glove-50-angular_hnsw.index
+-rw-r--r--  1 claretian  staff    95M Oct 31 16:39 lastfm-64-dot_hnsw.index
+-rw-r--r--  1 claretian  staff   184M Oct 31 16:40 mnist-784-euclidean_hnsw.index
+-rw-r--r--  1 claretian  staff   305M Oct 31 16:41 nytimes-256-angular_hnsw.index
+-rw-r--r--  1 claretian  staff   565M Oct 31 16:41 sift-128-euclidean_hnsw.index

@@ -6,7 +6,7 @@
 #include "../quant_functions.h"
 #include "gmm_cluster_runner.h"
 
-#define K 8                 // Number of GMM clusters
+#define K 64                 // Number of GMM clusters
 #define MAX_ITER 50         // EM iterations
 #define EPSILON 1e-6
 
@@ -14,7 +14,7 @@
 COMPILING:
     gcc -O2 gmm_clustering/gmm_cluster_runner.c quant_functions.c -lm -o gmm_cluster_runner
 
-RUNNING FOR EACH DATASET
+RUNNING FOR EACH DATASET:
     ./gmm_cluster_runner quantised_data/coco-i2i-512-angular_train_reduced.5bit
     ./gmm_cluster_runner quantised_data/fashion-mnist-784-euclidean_train_reduced.5bit
     ./gmm_cluster_runner quantised_data/gist-960-euclidean_train_reduced.5bit
@@ -86,6 +86,9 @@ static void initialize_gmm(float** data, uint32_t n, uint32_t dim,
     uint32_t first = rand() % n;
     memcpy(means[0], data[first], dim * sizeof(float));
 
+    for (uint32_t d = 0; d < dim; d++)
+        means[0][d] += ((float)rand() / RAND_MAX - 0.5f) * 0.01f;
+
     // For others, pick farthest samples
     for (uint32_t k = 1; k < K; k++) {
         float max_dist = -1.0f;
@@ -102,18 +105,124 @@ static void initialize_gmm(float** data, uint32_t n, uint32_t dim,
             }
         }
         memcpy(means[k], data[best], dim * sizeof(float));
+
+        for (uint32_t d = 0; d < dim; d++)
+            means[k][d] += ((float)rand() / RAND_MAX - 0.5f) * 0.01f;
     }
 
     for (uint32_t k = 0; k < K; k++) weights[k] = 1.0f / K;
 }
 
 // EM algorithm
+static float run_gmm(float** data, uint32_t n, uint32_t dim,
+                    float** means, float* weights, float** resp) {
+    float var = 1.0f;  // shared variance (updated each iter)
+
+    for (uint32_t iter = 0; iter < MAX_ITER; iter++) {
+        // --------------------------
+        // E-step (log-sum-exp for stability)
+        // --------------------------
+        for (uint32_t i = 0; i < n; i++) {
+            float log_p[K];
+            float max_log_p = -INFINITY;
+
+            // Compute unnormalized log-probabilities
+            for (uint32_t k = 0; k < K; k++) {
+                float dist = l2_sq(data[i], means[k], dim);
+                // log-likelihood proportional to -0.5 * dist / var + log(weight)
+                log_p[k] = logf(weights[k] + 1e-12f) - 0.5f * dist / var;
+                if (log_p[k] > max_log_p)
+                    max_log_p = log_p[k];
+            }
+
+            // Compute normalized responsibilities
+            float sum_exp = 0.0f;
+            for (uint32_t k = 0; k < K; k++) {
+                resp[i][k] = expf(log_p[k] - max_log_p);
+                sum_exp += resp[i][k];
+            }
+            for (uint32_t k = 0; k < K; k++)
+                resp[i][k] /= (sum_exp + EPSILON);
+        }
+
+        // --------------------------
+        // M-step
+        // --------------------------
+        float Nk[K] = {0};
+        for (uint32_t k = 0; k < K; k++) {
+            for (uint32_t i = 0; i < n; i++)
+                Nk[k] += resp[i][k];
+        }
+
+        // Update means
+        for (uint32_t k = 0; k < K; k++) {
+            memset(means[k], 0, dim * sizeof(float));
+            for (uint32_t i = 0; i < n; i++) {
+                for (uint32_t d = 0; d < dim; d++)
+                    means[k][d] += resp[i][k] * data[i][d];
+            }
+            for (uint32_t d = 0; d < dim; d++)
+                means[k][d] /= (Nk[k] + EPSILON);
+        }
+
+        // Update weights with floor + renormalization
+        float sumw = 0.0f;
+        for (uint32_t k = 0; k < K; k++) {
+            weights[k] = fmaxf(Nk[k] / n, 1e-6f);
+            sumw += weights[k];
+        }
+        for (uint32_t k = 0; k < K; k++)
+            weights[k] /= sumw;
+
+        // --------------------------
+        // Variance update (shared)
+        // --------------------------
+        float new_var = 0.0f;
+        for (uint32_t i = 0; i < n; i++) {
+            for (uint32_t k = 0; k < K; k++) {
+                for (uint32_t d = 0; d < dim; d++) {
+                    float diff = data[i][d] - means[k][d];
+                    new_var += resp[i][k] * diff * diff;
+                }
+            }
+        }
+        new_var /= (n * dim);
+        var = fmaxf(new_var, 1e-6f);
+
+        // --------------------------
+        // (Optional) log-likelihood for convergence monitoring
+        // --------------------------
+        double loglik = 0.0;
+        for (uint32_t i = 0; i < n; i++) {
+            float max_lp = -INFINITY;
+            float lp[K];
+            for (uint32_t k = 0; k < K; k++) {
+                float dist = l2_sq(data[i], means[k], dim);
+                lp[k] = logf(weights[k] + 1e-12f) - 0.5f * dist / var;
+                if (lp[k] > max_lp) max_lp = lp[k];
+            }
+            double sum_exp = 0.0;
+            for (uint32_t k = 0; k < K; k++)
+                sum_exp += exp(lp[k] - max_lp);
+            loglik += max_lp + log(sum_exp + EPSILON);
+        }
+
+        if (iter % 10 == 0)
+            printf("Iter %u: var=%.6f, loglik=%.4f\n", iter, var, loglik);
+
+    }
+    return var;
+}
+
+/*
 static void run_gmm(float** data, uint32_t n, uint32_t dim,
                     float** means, float* weights, float** resp) {
     float var = 1.0f; // shared variance for simplicity
 
     for (uint32_t iter = 0; iter < MAX_ITER; iter++) {
+        // --------------------------
         // E-step
+        // --------------------------
         for (uint32_t i = 0; i < n; i++) {
             float sum_r = 0.0f;
             for (uint32_t k = 0; k < K; k++) {
@@ -122,37 +231,60 @@ static void run_gmm(float** data, uint32_t n, uint32_t dim,
                 resp[i][k] = weights[k] * exponent;
                 sum_r += resp[i][k];
             }
-            for (uint32_t k = 0; k < K; k++) resp[i][k] /= (sum_r + EPSILON);
+            for (uint32_t k = 0; k < K; k++)
+                resp[i][k] /= (sum_r + EPSILON);
         }
 
+        // --------------------------
         // M-step
+        // --------------------------
         float Nk[K] = {0};
         for (uint32_t k = 0; k < K; k++) {
-            for (uint32_t i = 0; i < n; i++) Nk[k] += resp[i][k];
+            for (uint32_t i = 0; i < n; i++)
+                Nk[k] += resp[i][k];
         }
 
         // Update means
         for (uint32_t k = 0; k < K; k++) {
             memset(means[k], 0, dim * sizeof(float));
             for (uint32_t i = 0; i < n; i++) {
-                for (uint32_t d = 0; d < dim; d++) {
+                for (uint32_t d = 0; d < dim; d++)
                     means[k][d] += resp[i][k] * data[i][d];
+            }
+            for (uint32_t d = 0; d < dim; d++)
+                means[k][d] /= (Nk[k] + EPSILON);
+        }
+
+        // Update weights (with floor)
+        float sumw = 0.0f;
+        for (uint32_t k = 0; k < K; k++) {
+            weights[k] = fmaxf(Nk[k] / n, 1e-6f);
+            sumw += weights[k];
+        }
+        for (uint32_t k = 0; k < K; k++)
+            weights[k] /= sumw;
+
+        // --------------------------
+        // 🧠 NEW: Update shared variance
+        // --------------------------
+        float new_var = 0.0f;
+        for (uint32_t i = 0; i < n; i++) {
+            for (uint32_t k = 0; k < K; k++) {
+                for (uint32_t d = 0; d < dim; d++) {
+                    float diff = data[i][d] - means[k][d];
+                    new_var += resp[i][k] * diff * diff;
                 }
             }
-            for (uint32_t d = 0; d < dim; d++) {
-                means[k][d] /= (Nk[k] + EPSILON);
-            }
         }
+        new_var /= (n * dim);
+        var = fmaxf(new_var, 1e-6f); // avoid division by zero
 
-        // Update weights
-        for (uint32_t k = 0; k < K; k++) {
-            weights[k] = Nk[k] / n;
-        }
-
+        // Optional: print convergence info
         if (iter % 10 == 0)
-            printf("Iteration %u complete\n", iter);
+            printf("Iteration %u complete, var=%.6f\n", iter, var);
     }
 }
+*/
 
 // Assign each vector to its most probable cluster
 static uint32_t* assign_clusters(float** resp, uint32_t n) {
@@ -246,7 +378,7 @@ int main(int argc, char** argv) {
 
     // Initialize and run GMM
     initialize_gmm(data, header.n, header.dim, means, weights);
-    run_gmm(data, header.n, header.dim, means, weights, resp);
+    float var = run_gmm(data, header.n, header.dim, means, weights, resp);
 
     // Assign clusters and save index
     uint32_t* cluster_ids = assign_clusters(resp, header.n);
@@ -263,7 +395,7 @@ int main(int argc, char** argv) {
          "gmm_indexes/%s.gmm", strrchr(in_filename, '/') ?
          strrchr(in_filename, '/') + 1 : in_filename);
 
-    save_gmm_params(gmm_filename, means, weights, header.dim, 1.0f);
+    save_gmm_params(gmm_filename, means, weights, header.dim, var);
 
     // Free
     free_2d(data, header.n);

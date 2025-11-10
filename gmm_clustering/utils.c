@@ -306,6 +306,34 @@ void free_fvecs(float** data, uint32_t n) {
 }
 
 void compute_cluster_probabilities(const float* query, const gmm_params_t* gmm, float* probs) {
+    // log p_k ∝ log w_k - 0.5 * ||x - μ_k||^2 / var
+    float logp[K];
+    float max_logp = -INFINITY;
+    const float var = fmaxf(gmm->variance, 1e-6f); // floor
+
+    for (uint32_t k = 0; k < K; k++) {
+        float dist = 0.0f;
+        for (uint32_t d = 0; d < gmm->dim; d++) {
+            float diff = query[d] - gmm->means[k][d];
+            dist += diff * diff;
+        }
+        float lp = logf(gmm->weights[k] + 1e-12f) - 0.5f * dist / var;
+        logp[k] = lp;
+        if (lp > max_logp) max_logp = lp;
+    }
+
+    // softmax normalisation in log-space
+    float sumexp = 0.0f;
+    for (uint32_t k = 0; k < K; k++) {
+        probs[k] = expf(logp[k] - max_logp);
+        sumexp += probs[k];
+    }
+    float inv = 1.0f / (sumexp + 1e-12f);
+    for (uint32_t k = 0; k < K; k++) probs[k] *= inv;
+}
+
+/*
+void compute_cluster_probabilities(const float* query, const gmm_params_t* gmm, float* probs) {
     float var = gmm->variance;
     float sum_p = 0.0f;
     for (uint32_t k = 0; k < K; k++) {
@@ -320,3 +348,4 @@ void compute_cluster_probabilities(const float* query, const gmm_params_t* gmm, 
     }
     for (uint32_t k = 0; k < K; k++) probs[k] /= (sum_p + EPSILON);
 }
+    */

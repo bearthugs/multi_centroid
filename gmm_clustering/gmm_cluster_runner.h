@@ -3,7 +3,7 @@
 
 #include "../quant_functions.h"
 
-#define K 8
+#define K 64
 #define MAX_ITER 50
 #define EPSILON 1e-6
 

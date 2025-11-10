@@ -73,7 +73,7 @@ def plot_query_time(csv_path='results.csv', ef_values=[50, 100, 200], M_values=N
 
 
 def plot_recall(csv_path='results.csv', ef_values=[50, 100, 200], M_values=None):
-    """Plot M vs Recall@100 for each efConstruction value (fixed y-axis scale)."""
+    """Plot M vs Recall for each efConstruction value (fixed y-axis scale)."""
     output_dir = "final_graphs"
     os.makedirs(output_dir, exist_ok=True)
 
@@ -83,7 +83,7 @@ def plot_recall(csv_path='results.csv', ef_values=[50, 100, 200], M_values=None)
     if ef_values is not None:
         df = df[df['efConstruction'].isin(ef_values)]
 
-    y_min, y_max = 0, 1.01  # Recall always between 0–1
+    y_min, y_max = 0.5, 1.01  # Recall always between 0–1
 
     for ef in sorted(df['efConstruction'].unique()):
         subset = df[df['efConstruction'] == ef]
@@ -92,9 +92,9 @@ def plot_recall(csv_path='results.csv', ef_values=[50, 100, 200], M_values=None)
             group = group.sort_values('M')
             plt.plot(group['M'], group['recall@100'], marker='o', label=dataset)
         
-        plt.title(f"M vs Recall@100 (efConstruction = {ef})", fontsize=16)
+        plt.title(f"M vs Recall (efConstruction = {ef}, efSearch = 200)", fontsize=16)
         plt.xlabel("M", fontsize=14)
-        plt.ylabel("Recall@100", fontsize=14)
+        plt.ylabel("Recall", fontsize=14)
         plt.ylim(y_min, y_max)
         plt.legend(ncol=2, fontsize=10)
         plt.grid(True, linestyle='--', alpha=0.7)
@@ -180,7 +180,7 @@ def plot_query_time_together(csv_path='results.csv', ef_values=[50, 100, 200], M
 
 
 def plot_recall_together(csv_path='results.csv', ef_values=[50, 100, 200], M_values=None):
-    """Plot M vs Recall@100 across multiple efConstruction values (legend at bottom with spacing)."""
+    """Plot M vs Recall across multiple efConstruction values (legend at bottom with spacing)."""
     output_dir = "final_graphs"
     os.makedirs(output_dir, exist_ok=True)
 
@@ -203,11 +203,11 @@ def plot_recall_together(csv_path='results.csv', ef_values=[50, 100, 200], M_val
         ax.set_ylim(y_min, y_max)
         ax.grid(True, linestyle='--', alpha=0.7)
         if i == 0:
-            ax.set_ylabel("Recall@100", fontsize=12)
+            ax.set_ylabel("Recall", fontsize=12)
     
     handles, labels = ax.get_legend_handles_labels()
     fig.legend(handles, labels, loc='lower center', ncol=4, fontsize=9, frameon=False)
-    fig.suptitle("M vs Recall@100", fontsize=16)
+    fig.suptitle("M vs Recall (efSearch = 200)", fontsize=16)
     plt.tight_layout(rect=[0, 0.12, 1, 0.93])  # increased bottom margin
     filename = f"{output_dir}/M_vs_recall_all_ef.png"
     plt.savefig(filename, dpi=300)
