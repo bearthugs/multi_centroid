@@ -1,0 +1,6 @@
+dataset,test_n,dim,n*dim,k,query_time(ms),recall
+coco-i2i-512-angular,10000,100,1000000,8,0,0.609149
+coco-i2i-512-angular,10000,100,1000000,16,599907.101,0.588728
+coco-i2i-512-angular,10000,100,1000000,32,
+coco-i2i-512-angular,10000,100,1000000,64,
+coco-i2i-512-angular,10000,100,1000000,128,

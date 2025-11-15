@@ -5,7 +5,7 @@
 // - Euclidean mode: raw dequantised space.
 // - Cosine mode:     L2-normalised vectors; EM runs in that space (typical).
 //
-// COMPILING (example):
+// COMPILING:
 //   gcc -O2 gmm_clustering/gmm_clustering_euclidean.c 5bit_quantisation/quant_functions.c -lm -o gmm_cluster_euclidean
 //
 // RUNNING:
@@ -58,7 +58,7 @@
 //======================= CONFIG =======================
 
 // Global, easy-to-spot K (number of clusters)
-static int K = 128;
+static int K = 64;
 
 static const char* SUMMARY_CSV_PATH = "analysis_results/training_summary.csv";
 

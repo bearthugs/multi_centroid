@@ -5,7 +5,7 @@
 // - Euclidean mode: raw dequantised space.
 // - Cosine mode:     L2-normalised vectors; EM runs in that space (typical).
 //
-// COMPILING (example):
+// COMPILING:
 //   gcc -O2 gmm_clustering/gmm_clustering.c 5bit_quantisation/quant_functions.c -lm -o gmm_cluster
 //
 // RUNNING:
@@ -58,7 +58,7 @@
 //======================= CONFIG =======================
 
 // Global, easy-to-spot K (number of clusters)
-static int K = 128;
+static int K = 64;
 
 static const char* SUMMARY_CSV_PATH = "analysis_results/training_summary.csv";
 
@@ -572,7 +572,8 @@ static int em_gmm(const uint8_t* packed, const header_t* h,
     // --- Stronger starting floor for cosine datasets ---
     float var_floor = (metric == DIST_COSINE)
         ? 1e-3f   // higher initial variance for unit-norm data
-        : fmaxf(1e-12f, GLOBAL_VAR_FRACTION_FLOOR * fmaxf(global_var_scalar, 1e-12f));
+        : fmaxf(1e-12f,
+            GLOBAL_VAR_FRACTION_FLOOR * fmaxf(global_var_scalar, 1e-12f));
 
     free(gmean);
     free(gvar);
@@ -586,8 +587,11 @@ static int em_gmm(const uint8_t* packed, const header_t* h,
     float* inv_var = (float*)malloc(sizeof(float)*K*dim);    // 1/σ^2
     float* log_consts = (float*)malloc(sizeof(float)*K);     // -0.5 * ∑ log(2πσ^2)
 
-    if (!r || !logp || !Nk || !sum_mu || !sum_var || !inv_var || !log_consts) {
-        free(r); free(logp); free(Nk); free(sum_mu); free(sum_var); free(inv_var); free(log_consts); free(tmp);
+    if (!r || !logp || !Nk || !sum_mu || !sum_var
+        || !inv_var || !log_consts) {
+        free(r); free(logp); free(Nk); free(sum_mu);
+        free(sum_var); free(inv_var); free(log_consts);
+        free(tmp);
         return -1;
     }
 
@@ -627,7 +631,8 @@ static int em_gmm(const uint8_t* packed, const header_t* h,
                     quad += df*df * (double)invv[d];
                 }
                 double logNk = (double)log_consts[k] - 0.5 * quad;
-                logp[k] = (float)(log((double)fmaxf(weights[k], MIN_CLUSTER_WEIGHT)) + logNk);
+                logp[k] = (float)(log((double)fmaxf(weights[k],
+                    MIN_CLUSTER_WEIGHT)) + logNk);
             }
 
             float logsum = safe_log_sum_exp(logp, K);
@@ -686,7 +691,8 @@ static int em_gmm(const uint8_t* packed, const header_t* h,
                     quad += df*df * (double)invv[d];
                 }
                 double logNk = (double)log_consts[k] - 0.5 * quad;
-                logp[k] = (float)(log((double)fmaxf(weights[k], MIN_CLUSTER_WEIGHT)) + logNk);
+                logp[k] = (float)(log((double)fmaxf(weights[k],
+                    MIN_CLUSTER_WEIGHT)) + logNk);
             }
             float logsum2 = safe_log_sum_exp(logp, K);
             for (int k=0; k<K; ++k) r[k] = expf(logp[k] - logsum2);
@@ -723,16 +729,16 @@ static int em_gmm(const uint8_t* packed, const header_t* h,
         }
 
         if (it % 2 == 0)
-            maintain_cluster_balance(weights, means, variances, Nk, dim, K, n,
-                                    packed, h, metric, &var_floor);
+            maintain_cluster_balance(weights, means, variances,
+                Nk, dim, K, n, packed, h, metric, &var_floor);
 
 
         // --- Reinitialise degenerate clusters if needed ---
-        reinitialise_degenerate_clusters(packed, h, weights, means, variances, Nk, dim, K, metric);
+        reinitialise_degenerate_clusters(packed, h, weights, means,
+            variances, Nk, dim, K, metric);
 
         // ---------- Convergence check ----------
         double rel_impr = (isfinite(prev_ll)) ? ( (avg_ll - prev_ll) / (fabs(prev_ll) + 1e-12) ) : INFINITY;
-        // printf("EM iter %d: avg loglike = %.6f (rel +%.3e)\n", it+1, (float)avg_ll, (float)rel_impr);
         if (rel_impr >= 0.0 && rel_impr < EM_LIKELIHOOD_TOL) break;
         prev_ll = avg_ll;
     }
