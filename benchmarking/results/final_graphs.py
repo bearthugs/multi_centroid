@@ -2,9 +2,32 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
+# -------------------------------
+# GLOBAL STYLE IMPROVEMENTS
+# -------------------------------
+
+plt.rcParams.update({
+    "font.size": 18,
+    "axes.titlesize": 20,
+    "axes.labelsize": 18,
+    "legend.fontsize": 14,
+    "xtick.labelsize": 14,
+    "ytick.labelsize": 14
+})
+
+MARKERS = ['o', 's', '^', 'D', 'P', '*', 'X', 'v', '<', '>', 'h']
+
+def marker_for_dataset(name):
+    """Assign a consistent marker shape based on dataset name."""
+    idx = abs(hash(name)) % len(MARKERS)
+    return MARKERS[idx]
+
+
+# -------------------------------
+# INDIVIDUAL PLOTS
+# -------------------------------
 
 def plot_construction_time(csv_path='results.csv', ef_values=[50, 100, 200], M_values=None):
-    """Plot M vs Construction Time for each efConstruction value (fixed y-axis scale)."""
     output_dir = "final_graphs"
     os.makedirs(output_dir, exist_ok=True)
 
@@ -14,21 +37,29 @@ def plot_construction_time(csv_path='results.csv', ef_values=[50, 100, 200], M_v
     if ef_values is not None:
         df = df[df['efConstruction'].isin(ef_values)]
 
-    y_min, y_max = 1950, 9e7  # Fixed range for consistency
+    y_min, y_max = 1950, 9e7
 
     for ef in sorted(df['efConstruction'].unique()):
         subset = df[df['efConstruction'] == ef]
         plt.figure(figsize=(12, 8))
         for dataset, group in subset.groupby('dataset'):
             group = group.sort_values('M')
-            plt.plot(group['M'], group['construction_time(ms)'], marker='o', label=dataset)
+            plt.plot(
+                group['M'],
+                group['construction_time(ms)'],
+                marker=marker_for_dataset(dataset),
+                linestyle=':',
+                linewidth=2,
+                markersize=8,
+                label=dataset
+            )
         
-        plt.title(f"M vs Construction Time (efConstruction = {ef})", fontsize=16)
-        plt.xlabel("M", fontsize=14)
-        plt.ylabel("Construction Time (ms)", fontsize=14)
+        plt.title(f"M vs Construction Time (efConstruction = {ef})")
+        plt.xlabel("M")
+        plt.ylabel("Construction Time (ms)")
         plt.yscale("log")
         plt.ylim(y_min, y_max)
-        plt.legend(ncol=2, fontsize=10)
+        plt.legend(ncol=2)
         plt.grid(True, linestyle='--', alpha=0.7)
         plt.tight_layout()
 
@@ -39,7 +70,6 @@ def plot_construction_time(csv_path='results.csv', ef_values=[50, 100, 200], M_v
 
 
 def plot_query_time(csv_path='results.csv', ef_values=[50, 100, 200], M_values=None):
-    """Plot M vs Query Time for each efConstruction value (fixed y-axis scale)."""
     output_dir = "final_graphs"
     os.makedirs(output_dir, exist_ok=True)
 
@@ -49,20 +79,28 @@ def plot_query_time(csv_path='results.csv', ef_values=[50, 100, 200], M_values=N
     if ef_values is not None:
         df = df[df['efConstruction'].isin(ef_values)]
 
-    y_min, y_max = 0, 10000  # Fixed range for comparability
+    y_min, y_max = 0, 10000
 
     for ef in sorted(df['efConstruction'].unique()):
         subset = df[df['efConstruction'] == ef]
         plt.figure(figsize=(12, 8))
         for dataset, group in subset.groupby('dataset'):
             group = group.sort_values('M')
-            plt.plot(group['M'], group['query_time(ms)'], marker='o', label=dataset)
+            plt.plot(
+                group['M'],
+                group['query_time(ms)'],
+                marker=marker_for_dataset(dataset),
+                linestyle=':',
+                linewidth=2,
+                markersize=8,
+                label=dataset
+            )
         
-        plt.title(f"M vs Query Time (efConstruction = {ef})", fontsize=16)
-        plt.xlabel("M", fontsize=14)
-        plt.ylabel("Query Time (ms)", fontsize=14)
+        plt.title(f"M vs Query Time (efConstruction = {ef})")
+        plt.xlabel("M")
+        plt.ylabel("Query Time (ms)")
         plt.ylim(y_min, y_max)
-        plt.legend(ncol=2, fontsize=10)
+        plt.legend(ncol=2)
         plt.grid(True, linestyle='--', alpha=0.7)
         plt.tight_layout()
 
@@ -73,7 +111,6 @@ def plot_query_time(csv_path='results.csv', ef_values=[50, 100, 200], M_values=N
 
 
 def plot_recall(csv_path='results.csv', ef_values=[50, 100, 200], M_values=None):
-    """Plot M vs Recall for each efConstruction value (fixed y-axis scale)."""
     output_dir = "final_graphs"
     os.makedirs(output_dir, exist_ok=True)
 
@@ -83,20 +120,28 @@ def plot_recall(csv_path='results.csv', ef_values=[50, 100, 200], M_values=None)
     if ef_values is not None:
         df = df[df['efConstruction'].isin(ef_values)]
 
-    y_min, y_max = 0.5, 1.01  # Recall always between 0–1
+    y_min, y_max = 0.5, 1.01
 
     for ef in sorted(df['efConstruction'].unique()):
         subset = df[df['efConstruction'] == ef]
         plt.figure(figsize=(12, 8))
         for dataset, group in subset.groupby('dataset'):
             group = group.sort_values('M')
-            plt.plot(group['M'], group['recall@100'], marker='o', label=dataset)
+            plt.plot(
+                group['M'],
+                group['recall@100'],
+                marker=marker_for_dataset(dataset),
+                linestyle=':',
+                linewidth=2,
+                markersize=8,
+                label=dataset
+            )
         
-        plt.title(f"M vs Recall (efConstruction = {ef}, efSearch = 200)", fontsize=16)
-        plt.xlabel("M", fontsize=14)
-        plt.ylabel("Recall", fontsize=14)
+        plt.title(f"M vs Recall (efConstruction = {ef}, efSearch = 200)")
+        plt.xlabel("M")
+        plt.ylabel("Recall")
         plt.ylim(y_min, y_max)
-        plt.legend(ncol=2, fontsize=10)
+        plt.legend(ncol=2)
         plt.grid(True, linestyle='--', alpha=0.7)
         plt.tight_layout()
 
@@ -106,8 +151,11 @@ def plot_recall(csv_path='results.csv', ef_values=[50, 100, 200], M_values=None)
         print(f"Saved: {filename}")
 
 
+# -------------------------------
+# COMBINED PLOTS (multi-subplot)
+# -------------------------------
+
 def plot_construction_time_together(csv_path='results.csv', ef_values=[50, 100, 200], M_values=None):
-    """Plot M vs Construction Time across multiple efConstruction values (legend at bottom with spacing)."""
     output_dir = "final_graphs"
     os.makedirs(output_dir, exist_ok=True)
 
@@ -115,7 +163,7 @@ def plot_construction_time_together(csv_path='results.csv', ef_values=[50, 100, 
     if M_values is not None:
         df = df[df['M'].isin(M_values)]
 
-    y_min, y_max = 1950, 9e7  # Fixed y-axis range for comparability
+    y_min, y_max = 1950, 9e7
 
     fig, axes = plt.subplots(1, len(ef_values), figsize=(18, 6), sharey=True)
     for i, ef in enumerate(ef_values):
@@ -123,20 +171,28 @@ def plot_construction_time_together(csv_path='results.csv', ef_values=[50, 100, 
         subset = df[df['efConstruction'] == ef]
         for dataset, group in subset.groupby('dataset'):
             group = group.sort_values('M')
-            ax.plot(group['M'], group['construction_time(ms)'], marker='o', label=dataset)
+            ax.plot(
+                group['M'],
+                group['construction_time(ms)'],
+                marker=marker_for_dataset(dataset),
+                linestyle=':',
+                linewidth=2,
+                markersize=8,
+                label=dataset
+            )
         
-        ax.set_title(f"efConstruction = {ef}", fontsize=14)
-        ax.set_xlabel("M", fontsize=12)
-        plt.yscale("log")
+        ax.set_title(f"efConstruction = {ef}")
+        ax.set_xlabel("M")
+        ax.set_yscale("log")
         ax.set_ylim(y_min, y_max)
         ax.grid(True, linestyle='--', alpha=0.7)
         if i == 0:
-            ax.set_ylabel("Construction Time (ms)", fontsize=12)
+            ax.set_ylabel("Construction Time (ms)")
     
     handles, labels = ax.get_legend_handles_labels()
-    fig.legend(handles, labels, loc='lower center', ncol=4, fontsize=9, frameon=False)
-    fig.suptitle("M vs Construction Time", fontsize=16)
-    plt.tight_layout(rect=[0, 0.12, 1, 0.93])  # increased bottom margin
+    fig.legend(handles, labels, loc='lower center', ncol=4, frameon=False)
+    fig.suptitle("M vs Construction Time")
+    plt.tight_layout(rect=[0, 0.12, 1, 0.93])
     filename = f"{output_dir}/M_vs_construction_time_all_ef.png"
     plt.savefig(filename, dpi=300)
     plt.close()
@@ -144,7 +200,6 @@ def plot_construction_time_together(csv_path='results.csv', ef_values=[50, 100, 
 
 
 def plot_query_time_together(csv_path='results.csv', ef_values=[50, 100, 200], M_values=None):
-    """Plot M vs Query Time across multiple efConstruction values (legend at bottom with spacing)."""
     output_dir = "final_graphs"
     os.makedirs(output_dir, exist_ok=True)
 
@@ -152,7 +207,7 @@ def plot_query_time_together(csv_path='results.csv', ef_values=[50, 100, 200], M
     if M_values is not None:
         df = df[df['M'].isin(M_values)]
 
-    y_min, y_max = 0, 10000  # Fixed range for comparability
+    y_min, y_max = 0, 10000
 
     fig, axes = plt.subplots(1, len(ef_values), figsize=(18, 6), sharey=True)
     for i, ef in enumerate(ef_values):
@@ -160,19 +215,27 @@ def plot_query_time_together(csv_path='results.csv', ef_values=[50, 100, 200], M
         subset = df[df['efConstruction'] == ef]
         for dataset, group in subset.groupby('dataset'):
             group = group.sort_values('M')
-            ax.plot(group['M'], group['query_time(ms)'], marker='o', label=dataset)
+            ax.plot(
+                group['M'],
+                group['query_time(ms)'],
+                marker=marker_for_dataset(dataset),
+                linestyle=':',
+                linewidth=2,
+                markersize=8,
+                label=dataset
+            )
         
-        ax.set_title(f"efConstruction = {ef}", fontsize=14)
-        ax.set_xlabel("M", fontsize=12)
+        ax.set_title(f"efConstruction = {ef}")
+        ax.set_xlabel("M")
         ax.set_ylim(y_min, y_max)
         ax.grid(True, linestyle='--', alpha=0.7)
         if i == 0:
-            ax.set_ylabel("Query Time (ms)", fontsize=12)
+            ax.set_ylabel("Query Time (ms)")
     
     handles, labels = ax.get_legend_handles_labels()
-    fig.legend(handles, labels, loc='lower center', ncol=4, fontsize=9, frameon=False)
-    fig.suptitle("M vs Query Time", fontsize=16)
-    plt.tight_layout(rect=[0, 0.12, 1, 0.93])  # increased bottom margin
+    fig.legend(handles, labels, loc='lower center', ncol=4, frameon=False)
+    fig.suptitle("M vs Query Time")
+    plt.tight_layout(rect=[0, 0.12, 1, 0.93])
     filename = f"{output_dir}/M_vs_query_time_all_ef.png"
     plt.savefig(filename, dpi=300)
     plt.close()
@@ -180,7 +243,6 @@ def plot_query_time_together(csv_path='results.csv', ef_values=[50, 100, 200], M
 
 
 def plot_recall_together(csv_path='results.csv', ef_values=[50, 100, 200], M_values=None):
-    """Plot M vs Recall across multiple efConstruction values (legend at bottom with spacing)."""
     output_dir = "final_graphs"
     os.makedirs(output_dir, exist_ok=True)
 
@@ -188,7 +250,7 @@ def plot_recall_together(csv_path='results.csv', ef_values=[50, 100, 200], M_val
     if M_values is not None:
         df = df[df['M'].isin(M_values)]
 
-    y_min, y_max = 0.5, 1.01  # Fixed recall range
+    y_min, y_max = 0.5, 1.01
 
     fig, axes = plt.subplots(1, len(ef_values), figsize=(18, 6), sharey=True)
     for i, ef in enumerate(ef_values):
@@ -196,26 +258,37 @@ def plot_recall_together(csv_path='results.csv', ef_values=[50, 100, 200], M_val
         subset = df[df['efConstruction'] == ef]
         for dataset, group in subset.groupby('dataset'):
             group = group.sort_values('M')
-            ax.plot(group['M'], group['recall@100'], marker='o', label=dataset)
+            ax.plot(
+                group['M'],
+                group['recall@100'],
+                marker=marker_for_dataset(dataset),
+                linestyle=':',
+                linewidth=2,
+                markersize=8,
+                label=dataset
+            )
         
-        ax.set_title(f"efConstruction = {ef}", fontsize=14)
-        ax.set_xlabel("M", fontsize=12)
+        ax.set_title(f"efConstruction = {ef}")
+        ax.set_xlabel("M")
         ax.set_ylim(y_min, y_max)
         ax.grid(True, linestyle='--', alpha=0.7)
         if i == 0:
-            ax.set_ylabel("Recall", fontsize=12)
+            ax.set_ylabel("Recall")
     
     handles, labels = ax.get_legend_handles_labels()
-    fig.legend(handles, labels, loc='lower center', ncol=4, fontsize=9, frameon=False)
-    fig.suptitle("M vs Recall (efSearch = 200)", fontsize=16)
-    plt.tight_layout(rect=[0, 0.12, 1, 0.93])  # increased bottom margin
+    fig.legend(handles, labels, loc='lower center', ncol=4, frameon=False)
+    fig.suptitle("M vs Recall (efSearch = 200)")
+    plt.tight_layout(rect=[0, 0.12, 1, 0.93])
     filename = f"{output_dir}/M_vs_recall_all_ef.png"
     plt.savefig(filename, dpi=300)
     plt.close()
     print(f"Saved: {filename}")
 
 
-# --- Example usage --- #
+# -------------------------------
+# AUTO-RUN (same as original)
+# -------------------------------
+
 plot_construction_time('results.csv')
 plot_query_time('results.csv')
 plot_recall('results.csv')
