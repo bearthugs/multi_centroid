@@ -14,16 +14,40 @@
         fvecs_data/coco-i2i-512-angular_neighbours.ivecs
 
     ./compare_ivecs \
-        querying_results/sift-128-euclidean_test_reduced_gmm_candidates.ivecs \
-        fvecs_data/sift-128-euclidean_neighbours.ivecs
+        querying_results/K128/gist-960-euclidean_test_reduced_gmm_candidates.ivecs \
+        fvecs_data/gist-960-euclidean_neighbours.ivecs
 
     ./compare_ivecs \
-        querying_results/K128/glove-25-angular_test_reduced_gmm_candidates.ivecs \
+        querying_results/K32/glove-25-angular_test_reduced_gmm_candidates.ivecs \
         fvecs_data/glove-25-angular_neighbours.ivecs
 
     ./compare_ivecs \
-        querying_results/K128/glove-50-angular_test_reduced_gmm_candidates.ivecs \
+        querying_results/K64/glove-50-angular_test_reduced_gmm_candidates.ivecs \
         fvecs_data/glove-50-angular_neighbours.ivecs
+
+    ./compare_ivecs \
+        querying_results/K64/glove-100-angular_test_reduced_gmm_candidates.ivecs \
+        fvecs_data/glove-100-angular_neighbours.ivecs
+
+    ./compare_ivecs \
+        querying_results/K64/glove-200-angular_test_reduced_gmm_candidates.ivecs \
+        fvecs_data/glove-200-angular_neighbours.ivecs
+
+    ./compare_ivecs \
+        querying_results/K64/lastfm-64-dot_test_reduced_gmm_candidates.ivecs \
+        fvecs_data/lastfm-64-dot_neighbours.ivecs
+
+    ./compare_ivecs \
+        querying_results/K64/fashion-mnist-784-euclidean_test_reduced_gmm_candidates.ivecs \
+        fvecs_data/fashion-mnist-784-euclidean_neighbours.ivecs
+
+    ./compare_ivecs \
+        querying_results/K64/nytimes-256-angular_test_reduced_gmm_candidates.ivecs \
+        fvecs_data/nytimes-256-angular_neighbours.ivecs
+    
+    ./compare_ivecs \
+        querying_results/K128/sift-128-euclidean_test_reduced_gmm_candidates.ivecs \
+        fvecs_data/nytimes-256-angular_neighbours.ivecs
 */
 // ------------------------------------------------------------
 

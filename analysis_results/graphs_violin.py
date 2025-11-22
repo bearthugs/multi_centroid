@@ -3,16 +3,17 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 def plot_cluster_distributions(index_dir, K, output_dir="gmm_graphs"):
-    """
-    Parse cluster_to_vectors index files and plot violin plots showing
-    cluster size distributions for all datasets.
-    """
     os.makedirs(output_dir, exist_ok=True)
 
     all_data = []
 
-    # Iterate through all index files
+    # --- Load data ---
     for fname in os.listdir(index_dir):
         if not fname.endswith(".index"):
             continue
@@ -25,7 +26,7 @@ def plot_cluster_distributions(index_dir, K, output_dir="gmm_graphs"):
             for line in f:
                 parts = line.strip().split()
                 if len(parts) > 1:
-                    cluster_sizes.append(len(parts) - 1)  # subtract cluster ID itself
+                    cluster_sizes.append(len(parts) - 1)
                 else:
                     cluster_sizes.append(0)
 
@@ -38,30 +39,50 @@ def plot_cluster_distributions(index_dir, K, output_dir="gmm_graphs"):
 
     df = pd.DataFrame(all_data)
 
-    # === Plot Violin Plot ===
-    plt.figure(figsize=(14, 8))
+    # -----------------------------------------------------------
+    # (2) SHORTEN DATASET LABELS
+    # -----------------------------------------------------------
+    df["dataset_short"] = (
+        df["dataset"]
+        .str.replace("_train_reduced", "", regex=False)
+        .str.replace("_angular", "", regex=False)
+        .str.replace("_euclidean", "", regex=False)
+        .str.replace("_dot", "", regex=False)
+    )
+
+    # -----------------------------------------------------------
+    # (3) WIDER FIGURE + (4) STRONGER GRIDLINES
+    # -----------------------------------------------------------
+    plt.figure(figsize=(20, 8))
+
     sns.violinplot(
         data=df,
-        x="dataset",
+        x="dataset_short",
         y="cluster_size",
         inner="box",
         density_norm="width",
         bw_adjust=1.5,
         cut=1,
         gridsize=200,
+        linewidth=1.2
     )
-    plt.ylim(bottom=0)
-    plt.title(f"Distribution of Cluster Sizes Across Datasets ({K})", fontsize=16)
-    plt.xlabel("Dataset", fontsize=14)
-    plt.ylabel("Cluster Size (# of assigned vectors)", fontsize=14)
+
+    plt.yscale("log")
     plt.xticks(rotation=30, ha="right")
-    plt.grid(axis="y", linestyle="--", alpha=0.6)
+    plt.xlabel("Dataset", fontsize=15)
+    plt.ylabel("Cluster Size (# of assigned vectors, log scale)", fontsize=15)
+    plt.title(f"Distribution of Cluster Sizes Across Datasets ({K})", fontsize=18)
+
+    plt.grid(axis="y", linestyle="--", alpha=0.75, linewidth=0.7)
+
     plt.tight_layout()
 
     output_path = os.path.join(output_dir, f"cluster_violin_{K}.png")
     plt.savefig(output_path, dpi=300)
     plt.close()
+
     print(f"Saved violin plot: {output_path}")
+
 
 
 if __name__ == "__main__":

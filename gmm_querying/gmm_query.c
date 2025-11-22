@@ -19,65 +19,8 @@
 //
 // COMPILE:
 //   gcc -O2 gmm_querying/gmm_query.c 5bit_quantisation/quant_functions.c -lm -o gmm_query
-//
-/*
-    RUN:
-        ./gmm_query \
-            quantised_data/train/coco-i2i-512-angular_train_reduced.5bit \
-            quantised_data/test/coco-i2i-512-angular_test_reduced.5bit \
-            gmm_indexes/gmm/K8/coco-i2i-512-angular_train_reduced.gmm \
-            gmm_indexes/cluster_to_vectors/K8/coco-i2i-512-angular_train_reduced.index \
-            0.8 0.5
-
-        ./gmm_query \
-            quantised_data/train/coco-i2i-512-angular_train_reduced.5bit \
-            quantised_data/test/coco-i2i-512-angular_test_reduced.5bit \
-            gmm_indexes/gmm/K16/coco-i2i-512-angular_train_reduced.gmm \
-            gmm_indexes/cluster_to_vectors/K16/coco-i2i-512-angular_train_reduced.index \
-            0.8 0.5
-
-        ./gmm_query \
-            quantised_data/train/coco-i2i-512-angular_train_reduced.5bit \
-            quantised_data/test/coco-i2i-512-angular_test_reduced.5bit \
-            gmm_indexes/gmm/K32/coco-i2i-512-angular_train_reduced.gmm \
-            gmm_indexes/cluster_to_vectors/K32/coco-i2i-512-angular_train_reduced.index \
-            0.8 0.5
-
-        ./gmm_query \
-            quantised_data/train/coco-i2i-512-angular_train_reduced.5bit \
-            quantised_data/test/coco-i2i-512-angular_test_reduced.5bit \
-            gmm_indexes/gmm/K64/coco-i2i-512-angular_train_reduced.gmm \
-            gmm_indexes/cluster_to_vectors/K64/coco-i2i-512-angular_train_reduced.index \
-            0.8 0.5
-
-        ./gmm_query \
-            quantised_data/train/coco-i2i-512-angular_train_reduced.5bit \
-            quantised_data/test/coco-i2i-512-angular_test_reduced.5bit \
-            gmm_indexes/gmm/K128/coco-i2i-512-angular_train_reduced.gmm \
-            gmm_indexes/cluster_to_vectors/K128/coco-i2i-512-angular_train_reduced.index \
-            0.7 0.5
-
-        ./gmm_query \
-            quantised_data/train/gist-960-euclidean_train_reduced.5bit \
-            quantised_data/test/gist-960-euclidean_test_reduced.5bit \
-            gmm_indexes/gmm/K128/gist-960-euclidean_train_reduced.gmm \
-            gmm_indexes/cluster_to_vectors/K128/gist-960-euclidean_train_reduced.index \
-            0.8 0.5
-
-        ./gmm_query \
-            quantised_data/train/glove-50-angular_train_reduced.5bit \
-            quantised_data/test/glove-50-angular_test_reduced.5bit \
-            gmm_indexes/gmm/K128/glove-50-angular_train_reduced.gmm \
-            gmm_indexes/cluster_to_vectors/K128/glove-50-angular_train_reduced.index \
-            0.8 0.5
-
-        ./gmm_query \
-            quantised_data/train/glove-25-angular_train_reduced.5bit \
-            quantised_data/test/glove-25-angular_test_reduced.5bit \
-            gmm_indexes/gmm/K128/glove-25-angular_train_reduced.gmm \
-            gmm_indexes/cluster_to_vectors/K128/glove-25-angular_train_reduced.index \
-            0.8 0.5
-*/
+// RUN:
+//  ./gmm_query coco-i2i-512-angular 128 0.8 0.5
 // ------------------------------------------------------------
 
 
@@ -382,25 +325,45 @@ static int cmp_candidate(const void* a, const void* b) {
 // ============================ MAIN =========================
 
 int main(int argc, char** argv) {
-    if (argc != 7) {
+    if (argc != 5) {
         fprintf(stderr,
-            "Usage: %s <train.5bit> <test.5bit> <model.gmm> <cluster_to_vectors.index> <t_query> <t_edge>\n",
+            "Usage: %s <dataset_name> <K> <t_query> <t_edge>\n"
+            "Example: ./gmm_query coco-i2i-512-angular 128 0.8 0.5\n",
             argv[0]);
         return 1;
     }
 
-    const char* train_path  = argv[1];
-    const char* test_path   = argv[2];
-    const char* gmm_path    = argv[3];
-    const char* c2v_path    = argv[4];
-    float t_query = (float)atof(argv[5]);
-    float t_edge  = (float)atof(argv[6]);
+    const char* dataset = argv[1];
+    uint32_t K = (uint32_t)atoi(argv[2]);
+    float t_query = atof(argv[3]);
+    float t_edge  = atof(argv[4]);
 
-    printf("Train .5bit:  %s\n", train_path);
-    printf("Test  .5bit:  %s\n", test_path);
-    printf("GMM file:     %s\n", gmm_path);
-    printf("C2V index:    %s\n", c2v_path);
-    printf("t_query = %.4f, t_edge = %.4f\n", t_query, t_edge);
+    // Construct full paths automatically
+    char train_path[512], test_path[512], gmm_path[512], c2v_path[512];
+
+    snprintf(train_path, sizeof(train_path),
+        "quantised_data/train/%s_train_reduced.5bit", dataset);
+
+    snprintf(test_path, sizeof(test_path),
+        "quantised_data/test/%s_test_reduced.5bit", dataset);
+
+    snprintf(gmm_path, sizeof(gmm_path),
+        "gmm_indexes/gmm/K%u/%s_train_reduced.gmm", K, dataset);
+
+    snprintf(c2v_path, sizeof(c2v_path),
+        "gmm_indexes/cluster_to_vectors/K%u/%s_train_reduced.index", K, dataset);
+
+    printf("=== Running GMM Query ===\n");
+    printf("Dataset:     %s\n", dataset);
+    printf("K:           %u\n", K);
+    printf("t_query:     %.3f\n", t_query);
+    printf("t_edge:      %.3f\n\n", t_edge);
+
+    printf("Train file:  %s\n", train_path);
+    printf("Test file:   %s\n", test_path);
+    printf("GMM file:    %s\n", gmm_path);
+    printf("C2V file:    %s\n", c2v_path);
+
     clock_t t_start = clock();
 
     // --- Load training packed vectors ---
@@ -449,11 +412,17 @@ int main(int argc, char** argv) {
         free(weights); free(means); free(variances); free(log_consts);
         return 1;
     }
-    uint32_t K = gh.K;
+    if (gh.K != K) {
+        fprintf(stderr,
+            "ERROR: GMM file was trained with K=%u but you requested K=%u\n",
+            gh.K, K);
+        return 1;
+    }
+
     printf("GMM: K=%u dim=%u metric=%s normalised=%u\n",
-           gh.K, gh.dim,
-           (gh.metric==0 ? "euclidean" : "cosine"),
-           gh.normalised);
+        gh.K, gh.dim,
+        (gh.metric==0 ? "euclidean" : "cosine"),
+        gh.normalised);
 
     // --- Load cluster_to_vectors ---
     cluster_members_t* c2v = load_cluster_to_vectors(c2v_path, K);
@@ -482,13 +451,18 @@ int main(int argc, char** argv) {
     }
 
     // --- Prepare output file path ---
+    char out_dir[256];
+    snprintf(out_dir, sizeof(out_dir), "querying_results/K%u", K);
     ensure_dir("querying_results");
-    char base[512];
-    strip_ext(base_name(test_path), base, sizeof(base));
+    ensure_dir(out_dir);
 
     char out_path[1024];
     snprintf(out_path, sizeof(out_path),
-             "querying_results/%s_gmm_candidates.ivecs", base);
+            "querying_results/K%u/%s_test_reduced_gmm_candidates.ivecs",
+            K, dataset);
+
+    printf("Writing candidates to %s\n", out_path);
+
 
     FILE* fout = fopen(out_path, "wb");
     if (!fout) {
