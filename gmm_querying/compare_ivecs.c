@@ -10,15 +10,15 @@
 /*
 // RUN:
    ./compare_ivecs \
-        querying_results/K128/coco-i2i-512-angular_test_reduced_gmm_candidates.ivecs \
+        querying_results/K512/0.49/coco-i2i-512-angular_test_reduced_gmm_candidates.ivecs \
         fvecs_data/coco-i2i-512-angular_neighbours.ivecs
 
     ./compare_ivecs \
-        querying_results/K128/gist-960-euclidean_test_reduced_gmm_candidates.ivecs \
+        querying_results/K64/0.50/gist-960-euclidean_test_reduced_gmm_candidates.ivecs \
         fvecs_data/gist-960-euclidean_neighbours.ivecs
 
     ./compare_ivecs \
-        querying_results/K32/glove-25-angular_test_reduced_gmm_candidates.ivecs \
+        querying_results/K256/0.50/glove-25-angular_test_reduced_gmm_candidates.ivecs \
         fvecs_data/glove-25-angular_neighbours.ivecs
 
     ./compare_ivecs \
@@ -38,7 +38,7 @@
         fvecs_data/lastfm-64-dot_neighbours.ivecs
 
     ./compare_ivecs \
-        querying_results/K64/fashion-mnist-784-euclidean_test_reduced_gmm_candidates.ivecs \
+        querying_results/K64/0.50/fashion-mnist-784-euclidean_test_reduced_gmm_candidates.ivecs \
         fvecs_data/fashion-mnist-784-euclidean_neighbours.ivecs
 
     ./compare_ivecs \

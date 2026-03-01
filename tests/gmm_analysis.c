@@ -6,7 +6,7 @@
 //   gcc -O2 tests/gmm_analysis.c -lm -o gmm_analysis
 //
 // RUNNING:
-//   ./gmm_analysis gmm_indexes/gmm/coco-i2i-512-angular_train_reduced.gmm
+//   ./gmm_analysis gmm_indexes/gmm/K64/coco-i2i-512-angular_train_reduced.gmm 64
 //   ./gmm_analysis gmm_indexes/gmm/fashion-mnist-784-euclidean_train_reduced.gmm
 //   ./gmm_analysis gmm_indexes/gmm/gist-960-euclidean_train_reduced.gmm
 //   ./gmm_analysis gmm_indexes/gmm/glove-25-angular_train_reduced.gmm
@@ -110,11 +110,19 @@ static float cosine_distance(const float* a, const float* b, uint32_t dim) {
 }
 
 int main(int argc, char** argv) {
-    if(argc<2){
-        fprintf(stderr,"Usage: %s <gmm_file>\n", argv[0]);
+    if(argc < 3){
+        fprintf(stderr, "Usage: %s <gmm_file> <K>\n", argv[0]);
+        fprintf(stderr, "Example: %s gmm_indexes/gmm/xyz.gmm 128\n", argv[0]);
         return 1;
     }
+
     const char* path = argv[1];
+    int K_value = atoi(argv[2]);
+    if(K_value <= 0){
+        fprintf(stderr, "Invalid K: %s\n", argv[2]);
+        return 1;
+    }
+
     FILE* f = fopen(path,"rb");
     if(!f){ perror("fopen"); return 1; }
 
@@ -177,8 +185,27 @@ int main(int argc, char** argv) {
 
     // optional: save to file
     char outpath[512];
-    snprintf(outpath,sizeof(outpath),"analysis_results/%s_analysis.txt",
-             strrchr(path,'/') ? strrchr(path,'/')+1 : path);
+    // Extract filename (basename)
+    const char* fname = strrchr(path, '/');
+    fname = fname ? fname + 1 : path;
+
+    // Create directory analysis_results/K[K]
+    char k_dir[512];
+    snprintf(k_dir, sizeof(k_dir), "analysis_results/K%d", K_value);
+
+    #ifdef _WIN32
+    MKDIR("analysis_results");
+    MKDIR(k_dir);
+    #else
+    mkdir("analysis_results", 0755);
+    mkdir(k_dir, 0755);
+    #endif
+
+    // Create output file path
+    snprintf(outpath, sizeof(outpath),
+            "analysis_results/K%d/%s_analysis.txt",
+            K_value, fname);
+
 #ifdef _WIN32
     MKDIR("analysis_results");
 #else

@@ -450,16 +450,22 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // --- Prepare output file path ---
+    // Prepare output directory
     char out_dir[256];
     snprintf(out_dir, sizeof(out_dir), "querying_results/K%u", K);
+
+    char out_dir_edge[256];
+    snprintf(out_dir_edge, sizeof(out_dir_edge), "querying_results/K%u/%.2f", K, t_edge);
+
     ensure_dir("querying_results");
     ensure_dir(out_dir);
+    ensure_dir(out_dir_edge);
 
+    // Full output path
     char out_path[1024];
     snprintf(out_path, sizeof(out_path),
-            "querying_results/K%u/%s_test_reduced_gmm_candidates.ivecs",
-            K, dataset);
+            "querying_results/K%u/%.2f/%s_test_reduced_gmm_candidates.ivecs",
+            K, t_edge, dataset);
 
     printf("Writing candidates to %s\n", out_path);
 
@@ -619,6 +625,38 @@ int main(int argc, char** argv) {
     clock_t t_end = clock();
     double ms = 1000.0 * (double)(t_end - t_start) / CLOCKS_PER_SEC;
     printf("Total query time: %.3f ms\n", ms);
+
+    char csv_path[512];
+    snprintf(csv_path, sizeof(csv_path),
+             "../querying_results/time.csv");
+
+    // Ensure directory exists
+    ensure_dir("../querying_results");
+
+    FILE* fcsv = fopen(csv_path, "a");
+    if (!fcsv) {
+        fprintf(stderr, "ERROR: could not open %s for writing\n", csv_path);
+    } else {
+        // Write header if empty file
+        fseek(fcsv, 0, SEEK_END);
+        long size = ftell(fcsv);
+        if (size == 0) {
+            fprintf(fcsv,
+                "dataset,n,d,n*d,K,t_query,t_edge,query_time_ms\n");
+        }
+
+        fprintf(fcsv, "%s,%u,%u,%u,%u,%.6f,%.6f,%.3f\n",
+                dataset,        // dataset name
+                n_test,         // n
+                dim,            // d
+                n_test * dim,   // n*d
+                K,              // number of clusters
+                t_query,        // threshold for expanding query clusters
+                t_edge,         // threshold for BFS expansion across edges
+                ms);            // total query time in ms
+
+        fclose(fcsv);
+    }
 
 
     return 0;
